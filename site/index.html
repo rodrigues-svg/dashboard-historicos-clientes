@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#C94B5E">
+<title>Dashboard Consulta Históricos de Clientes</title>
+<link rel="icon" type="image/png" href="img/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<!-- ícones -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-menu" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></g></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></g></symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></g></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></g></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></g></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></g></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></g></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></g></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></g></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></g></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></g></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></g></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></g></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></g></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></g></symbol>
+    <symbol id="i-eyeoff" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></g></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></g></symbol>
+    <symbol id="i-medal" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></g></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path fill="currentColor" d="M12 4l9 15H3z"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path fill="currentColor" d="M12 20L3 5h18z"/></symbol>
+  </defs>
+</svg>
+
+<div id="toast-root" aria-live="polite"></div>
+
+<!-- ====================== LOGIN ====================== -->
+<main id="login-view" class="login">
+  <form id="login-form" class="login-card" autocomplete="on" novalidate>
+    <span class="logo-chip"><img src="img/logo.png" alt="Novavet Distribuidora" width="200" height="63"></span>
+    <h1>Consulta Históricos de Clientes</h1>
+    <p class="login-sub">Entre com o seu e-mail e a senha de 4 dígitos.</p>
+    <div id="login-invalid" class="notice notice-error" hidden></div>
+    <label class="field"><span>E-mail</span>
+      <input id="login-email" name="username" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" required>
+    </label>
+    <label class="field"><span>Senha (4 dígitos)</span>
+      <div class="pw">
+        <input id="login-pin" name="password" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="current-password" required>
+        <button type="button" id="pw-toggle" aria-label="Mostrar senha"><svg><use href="#i-eye"/></svg></button>
+      </div>
+    </label>
+    <div id="login-error" class="form-error" role="alert" hidden></div>
+    <button id="login-btn" class="btn btn-primary btn-block" type="submit">Entrar</button>
+    <p class="login-help">Precisa de ajuda? <span id="support-line"></span></p>
+  </form>
+</main>
+
+<!-- ====================== APP ====================== -->
+<div id="app-view" hidden>
+  <header class="topbar">
+    <button id="btn-menu" class="icon-btn only-mobile" aria-label="Abrir menu"><svg><use href="#i-menu"/></svg></button>
+    <a class="logo-chip" href="#top" aria-label="Início"><img src="img/logo.png" alt="Novavet Distribuidora"></a>
+    <div class="topbar-title">
+      <h1>Consulta Históricos de Clientes</h1>
+      <p id="top-sub"></p>
+    </div>
+    <div class="topbar-actions">
+      <button id="btn-pdf" class="btn btn-secondary"><svg><use href="#i-mail"/></svg><span>Enviar Histórico em PDF</span></button>
+      <button id="btn-csv" class="btn btn-ghost"><svg><use href="#i-download"/></svg><span>Exportar CSV</span></button>
+      <button id="btn-user" class="user-chip" aria-label="Menu do usuário">
+        <span class="avatar" id="user-avatar"></span>
+        <span class="who"><b id="user-name"></b><small id="user-role"></small></span>
+      </button>
+    </div>
+  </header>
+
+  <main class="content" id="top">
+    <!-- filtros -->
+    <section id="filters" class="card filters" aria-label="Filtros">
+      <div class="filters-head">
+        <h2>Filtros</h2>
+        <span id="filters-badge" class="badge" hidden>0</span>
+        <button id="btn-clear" class="btn btn-ghost btn-sm" type="button">Limpar filtros</button>
+        <button id="btn-close-filters" class="icon-btn only-mobile" type="button" aria-label="Fechar filtros"><svg><use href="#i-x"/></svg></button>
+      </div>
+      <div class="presets" id="presets" role="group" aria-label="Períodos rápidos"></div>
+      <div class="filters-grid">
+        <div class="f f-period">
+          <span class="lbl" id="lbl-period">Período (mês/ano)</span>
+          <div class="period" role="group" aria-labelledby="lbl-period">
+            <div class="pgrp"><span>De</span>
+              <select id="f-from-m" aria-label="Mês inicial"></select><select id="f-from-y" class="yr" aria-label="Ano inicial"></select></div>
+            <div class="pgrp"><span class="to-lbl">até</span>
+              <select id="f-to-m" aria-label="Mês final"></select><select id="f-to-y" class="yr" aria-label="Ano final"></select></div>
+          </div>
+          <span class="hint">Os dados são mensais; o período vai do 1º dia do mês inicial ao fim do mês final.</span>
+        </div>
+        <div class="f"><label for="f-tipo">Tipo de cliente</label>
+          <select id="f-tipo"><option value="">Todos</option><option value="F">Físico (F)</option><option value="J">Jurídico (J)</option></select></div>
+        <div class="f" id="f-cliente"></div>
+        <div class="f" id="f-principal"></div>
+        <div class="f" id="f-lab"></div>
+        <div class="f" id="f-mes"></div>
+        <div class="f" id="f-produto"></div>
+        <div class="f" id="f-sup-wrap" hidden><label for="f-sup">Supervisor</label><select id="f-sup"></select></div>
+        <div class="f" id="f-rca" hidden></div>
+        <div class="f">
+          <span class="lbl">Comparativo</span>
+          <label class="switch"><input type="checkbox" id="f-ytd"><span class="track"></span>
+            <span class="txt">Comparativo YTD<small>Mesmo período do ano anterior</small></span></label>
+        </div>
+      </div>
+      <div class="filters-apply only-mobile"><button id="btn-apply" class="btn btn-primary btn-block" type="button">Ver resultados</button></div>
+    </section>
+
+    <div id="active-chips" class="chips" aria-label="Filtros ativos"></div>
+
+    <div id="results">
+      <section id="kpis" class="kpis" aria-label="Resumo do período"></section>
+      <p id="kpi-note" class="note"></p>
+
+      <section id="chart-card" class="card" aria-labelledby="chart-title">
+        <div class="card-head">
+          <div><h2 id="chart-title">Evolução mensal</h2><p id="chart-sub"></p></div>
+          <div class="head-tools">
+            <div class="seg" id="metric-seg" role="group" aria-label="Métrica do gráfico">
+              <button type="button" data-m="liq" aria-pressed="true">Valor líquido</button>
+              <button type="button" data-m="venda" aria-pressed="false">Venda</button>
+              <button type="button" data-m="qtd" aria-pressed="false">Itens</button>
+            </div>
+            <div class="seg" id="view-seg" role="group" aria-label="Forma de exibição">
+              <button type="button" data-v="chart" aria-pressed="true">Gráfico</button>
+              <button type="button" data-v="table" aria-pressed="false">Tabela</button>
+            </div>
+          </div>
+        </div>
+        <div class="legend" id="legend"></div>
+        <div class="chart-box" id="chart-box"><canvas id="chart" role="img" aria-label="Gráfico de barras com a evolução mensal"></canvas></div>
+        <div class="table-wrap" id="chart-table" hidden></div>
+      </section>
+
+      <section id="rank-card" class="card" aria-labelledby="rank-title">
+        <div class="card-head">
+          <div><h2 id="rank-title">Ranking</h2><p id="rank-sub"></p></div>
+          <div class="seg tabs" id="rank-tabs" role="group" aria-label="Tipo de ranking"></div>
+        </div>
+        <div id="rank-table"></div>
+      </section>
+
+      <section id="detail-card" class="card" aria-labelledby="detail-title">
+        <div class="card-head">
+          <div><h2 id="detail-title">Histórico de compras</h2><p id="detail-sub"></p></div>
+          <div class="head-tools"><button id="btn-csv2" class="btn btn-ghost btn-sm" type="button"><svg><use href="#i-download"/></svg><span>Exportar filtros atuais</span></button></div>
+        </div>
+        <div id="detail-table"></div>
+      </section>
+    </div>
+
+    <footer class="foot">
+      <span id="foot-updated"></span>
+      <span id="foot-support"></span>
+    </footer>
+  </main>
+
+  <nav class="bottombar only-mobile" aria-label="Navegação">
+    <button id="bb-back" type="button"><svg><use href="#i-back"/></svg>Histórico</button>
+    <button id="bb-filters" type="button"><svg><use href="#i-filter"/></svg>Filtros<span id="bb-badge" class="badge b-badge" hidden>0</span></button>
+    <button id="bb-actions" type="button"><svg><use href="#i-file"/></svg>Ações</button>
+    <button id="bb-profile" type="button"><svg><use href="#i-user"/></svg>Perfil</button>
+  </nav>
+
+  <div id="scrim" class="scrim"></div>
+
+  <!-- menu / perfil -->
+  <aside id="menu-drawer" class="drawer" aria-label="Menu" aria-hidden="true">
+    <div class="drawer-head">
+      <span class="logo-chip"><img src="img/logo.png" alt="Novavet Distribuidora"></span>
+      <button id="btn-close-menu" class="icon-btn" aria-label="Fechar menu"><svg><use href="#i-x"/></svg></button>
+    </div>
+    <div class="drawer-body">
+      <div class="me"><span class="avatar" id="menu-avatar"></span><div><b id="menu-name"></b><small id="menu-mail"></small></div></div>
+      <ul class="menu-list">
+        <li><button type="button" data-go="home"><svg><use href="#i-home"/></svg>Início</button></li>
+        <li><button type="button" data-go="filters"><svg><use href="#i-filter"/></svg>Filtros avançados</button></li>
+        <li><button type="button" data-go="pdf"><svg><use href="#i-mail"/></svg>Enviar histórico em PDF</button></li>
+        <li><button type="button" data-go="csv"><svg><use href="#i-download"/></svg>Exportar CSV</button></li>
+        <li id="menu-admin" hidden><button type="button" data-go="admin"><svg><use href="#i-shield"/></svg>Administração</button></li>
+      </ul>
+      <div class="menu-sec"><h3>Histórico de buscas</h3><ul class="hist-list" id="hist-list"></ul></div>
+      <div class="menu-sec"><h3>Configurações</h3>
+        <div class="seg" id="theme-seg" role="group" aria-label="Tema">
+          <button type="button" data-t="auto" aria-pressed="true">Automático</button>
+          <button type="button" data-t="light" aria-pressed="false">Claro</button>
+          <button type="button" data-t="dark" aria-pressed="false">Escuro</button>
+        </div>
+      </div>
+      <ul class="menu-list"><li><button type="button" data-go="logout"><svg><use href="#i-logout"/></svg>Sair</button></li></ul>
+    </div>
+  </aside>
+
+  <!-- ações (mobile) -->
+  <dialog id="modal-actions" class="modal">
+    <div class="modal-in">
+      <h2>Ações</h2>
+      <button id="act-pdf" class="btn btn-secondary btn-block" type="button"><svg><use href="#i-mail"/></svg>Enviar Histórico em PDF</button>
+      <button id="act-csv" class="btn btn-ghost btn-block" type="button"><svg><use href="#i-download"/></svg>Exportar CSV (filtros atuais)</button>
+      <button class="btn btn-ghost btn-block" type="button" data-close>Fechar</button>
+    </div>
+  </dialog>
+
+  <!-- envio de PDF -->
+  <dialog id="modal-pdf" class="modal" aria-labelledby="pdf-title">
+    <div class="modal-in">
+      <h2 id="pdf-title">Enviar histórico de compra</h2>
+      <div class="kv" id="pdf-summary"></div>
+      <div id="pdf-alert" class="notice notice-warn" hidden></div>
+      <fieldset style="border:0;padding:0;margin:0;display:grid;gap:10px">
+        <legend class="sr-only">Destinatário</legend>
+        <label class="opt"><input type="radio" name="pdf-dest" value="me" checked><span><b>Meu e-mail</b><small id="pdf-my-mail"></small></span></label>
+        <label class="opt"><input type="radio" name="pdf-dest" value="client"><span><b>E-mail do cliente</b><small>Somente com um único cliente selecionado.</small></span></label>
+      </fieldset>
+      <label class="field" id="pdf-client-wrap" hidden><span>E-mail do cliente</span>
+        <input id="pdf-client-mail" type="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="email@cliente.com"></label>
+      <div id="pdf-error" class="form-error" role="alert" hidden></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" type="button" data-close>Cancelar</button>
+        <button id="pdf-send" class="btn btn-primary" type="button">Enviar PDF</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- administração (gerente) -->
+  <dialog id="modal-admin" class="modal wide" aria-labelledby="admin-title">
+    <div class="modal-in">
+      <h2 id="admin-title">Administração de acessos</h2>
+      <div class="notice notice-info">Tokens e senhas nunca aparecem aqui. Renovar ou revogar um acesso é feito no gerador (comandos abaixo) e vale assim que o site for atualizado.</div>
+      <div class="table-wrap" id="admin-users"></div>
+      <div class="menu-sec"><h3>Renovar / revogar</h3>
+        <div class="copyrow"><code id="cmd-renew">python gerar_dashboard.py --renovar "NOME COMPLETO OU E-MAIL"</code><button class="btn btn-ghost btn-sm" type="button" data-copy="cmd-renew"><svg><use href="#i-copy"/></svg>Copiar</button></div>
+        <div class="copyrow" style="margin-top:8px"><code id="cmd-revoke">python gerar_dashboard.py --revogar "NOME COMPLETO OU E-MAIL"</code><button class="btn btn-ghost btn-sm" type="button" data-copy="cmd-revoke"><svg><use href="#i-copy"/></svg>Copiar</button></div>
+      </div>
+      <div class="menu-sec"><h3>Log de acessos e envios</h3><div id="admin-log" class="muted">Carregando…</div></div>
+      <div class="modal-actions"><button class="btn btn-ghost" type="button" data-close>Fechar</button></div>
+    </div>
+  </dialog>
+</div>
+
+<script src="config.js"></script>
+<script src="js/logo-data.js"></script>
+<script src="vendor/chart.umd.min.js" defer></script>
+<script src="vendor/jspdf.umd.min.js" defer></script>
+<script src="vendor/jspdf.plugin.autotable.min.js" defer></script>
+<script src="js/util.js" defer></script>
+<script src="js/auth.js" defer></script>
+<script src="js/engine.js" defer></script>
+<script src="js/widgets.js" defer></script>
+<script src="js/pdf.js" defer></script>
+<script src="js/app.js" defer></script>
+</body>
+</html>

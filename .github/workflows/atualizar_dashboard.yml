@@ -1,0 +1,74 @@
+name: Atualizar Dashboard Consulta Historicos de Clientes
+
+# Atualização automática: TERÇA a SÁBADO às 07:30 (horário de Brasília).
+#
+# Este repositório é PÚBLICO. Em repositório público o GitHub DESATIVA os agendamentos nativos
+# ("schedule") após 60 dias sem atividade - por isso o horário é disparado pelo cron-job.org via
+# repository_dispatch (mesmo padrão dos outros projetos), e não por "schedule":
+#   URL      https://api.github.com/repos/<usuario>/<repositorio>/dispatches   (POST)
+#   Horário  terça a sábado, 07:30, fuso America/Sao_Paulo  (crontab 30 7 * * 2-6)
+#   Corpo    {"event_type":"atualizar-dashboard-historicos"}
+# O e-mail com a planilha chega de segunda a sexta; a atualização roda na manhã seguinte.
+# Passo a passo completo: PASSO_A_PASSO_GITHUB.md
+on:
+  repository_dispatch:
+    types: [atualizar-dashboard-historicos]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Restaurar segredos (nada disso fica no repositorio publico)
+        env:
+          TOKEN_JSON: ${{ secrets.TOKEN_JSON }}                  # OAuth do Gmail (mesmo dos outros projetos)
+          TOKENS_JSON: ${{ secrets.TOKENS_JSON }}                # tokens permanentes dos usuarios
+          USUARIOS_CSV: ${{ secrets.USUARIOS_CSV }}              # cadastro: nomes, hierarquia, e-mail/telefone/senha
+          CONFIG_LOCAL_JSON: ${{ secrets.CONFIG_LOCAL_JSON }}    # remetente/assunto do relatorio (gmail)
+        run: |
+          printf '%s' "$TOKEN_JSON" > token.json
+          printf '%s' "$TOKENS_JSON" > tokens.json
+          printf '%s' "$USUARIOS_CSV" > usuarios.csv
+          printf '%s' "$CONFIG_LOCAL_JSON" > config.local.json
+          test -s token.json         || { echo "::error::Secret TOKEN_JSON ausente";         exit 1; }
+          test -s tokens.json        || { echo "::error::Secret TOKENS_JSON ausente";        exit 1; }
+          test -s usuarios.csv       || { echo "::error::Secret USUARIOS_CSV ausente";       exit 1; }
+          test -s config.local.json  || { echo "::error::Secret CONFIG_LOCAL_JSON ausente";  exit 1; }
+
+      - name: Gerar dados criptografados a partir do e-mail mais recente
+        run: python gerar_dashboard.py --gmail --sem-excel --ci
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

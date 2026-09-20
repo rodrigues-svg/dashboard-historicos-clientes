@@ -1,0 +1,14 @@
+# SEGREDOS / DADOS PESSOAIS - nunca publicar
+tokens.json
+token.json
+credentials.json
+usuarios.csv
+config.local.json
+Links_Acesso_*.xlsx
+apps_script/usuarios_autorizados.json
+
+# dados gerados (o deploy publica site/data a partir do CI; nao versionar)
+site/data/*.js
+
+__pycache__/
+*.pyc

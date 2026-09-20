@@ -1,0 +1,6 @@
+pandas
+openpyxl
+cryptography
+xlsxwriter
+qrcode
+pillow
