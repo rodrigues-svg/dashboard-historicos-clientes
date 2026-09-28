@@ -3,13 +3,14 @@ name: Atualizar Dashboard Consulta Historicos de Clientes
 # Atualização automática: TERÇA a SÁBADO às 07:30 (horário de Brasília).
 #
 # Este repositório é PÚBLICO. Em repositório público o GitHub DESATIVA os agendamentos nativos
-# ("schedule") após 60 dias sem atividade - por isso o horário é disparado pelo cron-job.org via
-# repository_dispatch (mesmo padrão dos outros projetos), e não por "schedule":
-#   URL      https://api.github.com/repos/<usuario>/<repositorio>/dispatches   (POST)
-#   Horário  terça a sábado, 07:30, fuso America/Sao_Paulo  (crontab 30 7 * * 2-6)
-#   Corpo    {"event_type":"atualizar-dashboard-historicos"}
+# ("schedule") após 60 dias sem atividade - por isso o horário é disparado pelo cron-job.org chamando o
+# endpoint de workflow_dispatch (token com a permissão mínima "Actions: Read and write", que não altera código):
+#   URL      https://api.github.com/repos/<usuario>/<repositorio>/actions/workflows/atualizar_dashboard.yml/dispatches  (POST)
+#   Horário  terça a sábado, 07:30, fuso America/Sao_Paulo
+#   Corpo    {"ref":"main"}
 # O e-mail com a planilha chega de segunda a sexta; a atualização roda na manhã seguinte.
-# Passo a passo completo: PASSO_A_PASSO_GITHUB.md
+# Passo a passo: PASSO_A_PASSO_CRON_JOB_ORG.md e PASSO_A_PASSO_GITHUB.md
+# (repository_dispatch continua aceito, mas exige token com "Contents: write" - não recomendado).
 on:
   repository_dispatch:
     types: [atualizar-dashboard-historicos]

@@ -59,9 +59,10 @@ não tem nenhum nome de pessoa embutido, porque o repositório é público. Regr
 ```
 
 **Agendamento (terça a sábado, 07:30 de Brasília):** o workflow `.github/workflows/atualizar_dashboard.yml` é disparado
-pelo **cron-job.org** (`repository_dispatch`), e não por `schedule`, porque em repositório público o GitHub desativa
-agendamentos nativos após 60 dias sem atividade. A cada disparo ele baixa o e-mail mais recente, regera os dados
-cifrados e publica no GitHub Pages. Também pode ser iniciado à mão (*Actions → Run workflow*).
+pelo **cron-job.org** (endpoint de `workflow_dispatch`, com um token que só tem a permissão *Actions*), e não por
+`schedule`, porque em repositório público o GitHub desativa agendamentos nativos após 60 dias sem atividade. A cada
+disparo ele baixa o e-mail mais recente, regera os dados cifrados e publica no GitHub Pages (~1 min). Também pode ser
+iniciado à mão (*Actions → Run workflow*). Roteiro: **[PASSO_A_PASSO_CRON_JOB_ORG.md](PASSO_A_PASSO_CRON_JOB_ORG.md)**.
 
 Proteções embutidas:
 * **Remetente verificado**: como o e-mail alimenta o painel, o gerador só aceita mensagem cujo `From` seja o remetente

@@ -133,23 +133,25 @@ gh api repos/rodrigues-svg/dashboard-historicos-clientes/pages --jq .html_url
 
 ## 7. Agendamento: terça a sábado, 07:30 (Brasília) — cron-job.org
 
-O workflow **não tem `schedule`** (item 1); sem este passo nada roda sozinho.
+O workflow **não tem `schedule`** (item 1); sem este passo nada roda sozinho. O roteiro completo, com testes e
+solução de problemas, está em **[PASSO_A_PASSO_CRON_JOB_ORG.md](PASSO_A_PASSO_CRON_JOB_ORG.md)**. Resumo:
 
 1. github.com/settings/personal-access-tokens/new → token *fine-grained*, **somente este repositório**, permissão
-   **Contents: Read and write** (é a que o endpoint de disparo exige). Defina a validade e **anote a data de expiração**
-   (quando vencer, o disparo para de funcionar). Copie o token.
+   **Actions: Read and write** (e nada mais). Defina a validade e **anote a data de expiração** (quando vencer, o
+   disparo para). Copie o token. *Não use `Contents: write`*: esse token poderia alterar o código que roda no CI com os
+   seus segredos; o de *Actions* só consegue iniciar/gerenciar execuções.
 2. Em cron-job.org crie o job e **ative o aviso por e-mail em caso de falha**:
 
    | Campo | Valor |
    |---|---|
-   | URL | `https://api.github.com/repos/rodrigues-svg/dashboard-historicos-clientes/dispatches` |
+   | URL | `https://api.github.com/repos/rodrigues-svg/dashboard-historicos-clientes/actions/workflows/atualizar_dashboard.yml/dispatches` |
    | Método | POST |
-   | Horário | terça a sábado, 07:30 — fuso **America/Sao_Paulo** (crontab `30 7 * * 2-6`) |
-   | Headers | `Authorization: Bearer SEU_TOKEN` e `Accept: application/vnd.github+json` |
-   | Corpo | `{"event_type":"atualizar-dashboard-historicos"}` |
+   | Horário | terça a sábado, 07:30 — fuso **America/Sao_Paulo** |
+   | Headers | `Authorization: Bearer SEU_TOKEN`, `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`, `Content-Type: application/json`, `User-Agent: cron-job.org` |
+   | Corpo | `{"ref":"main"}` |
 
-3. Use o botão de teste/execução manual do cron-job.org: em *Actions* do repositório deve aparecer uma nova execução.
-   O código de resposta esperado é **204**.
+3. Use o teste do cron-job.org: a resposta esperada é **204** e, em *Actions*, aparece uma nova execução
+   (evento `workflow_dispatch`), que termina em cerca de 1 minuto.
 
 ## 8. Definir o endereço final e gerar o Excel de links
 
@@ -214,6 +216,6 @@ afetados (`--renovar`), atualize os segredos e me chame para limpar o repositór
   `python setup_oauth.py --credentials ...` e atualize o secret: `gh secret set TOKEN_JSON < token.json`.
 - **"Link inválido ou revogado" para alguém que estava funcionando**: renovou o token e esqueceu de atualizar
   `TOKENS_JSON`, ou o workflow ainda não rodou depois da mudança.
-- **O cron-job.org devolve 401/404**: token vencido ou sem a permissão *Contents: Read and write*, ou usuário/repositório
+- **O cron-job.org devolve 401/404**: token vencido ou sem a permissão *Actions: Read and write*, ou usuário/repositório
   errado na URL.
 - **Página em branco/404 logo após o deploy**: aguarde 1–2 min e confira a barra final da URL.
