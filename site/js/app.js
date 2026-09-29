@@ -443,6 +443,9 @@
     const alt = h("button", { class: "btn btn-ghost", type: "button", id: "pdf-mailto", hidden: true }, "Baixar e abrir e-mail");
     alt.addEventListener("click", () => sendPdf(true));
     $("#pdf-send").before(alt);
+    const wa = h("button", { class: "btn btn-ghost", type: "button", id: "pdf-wa" }, icon("i-whatsapp"), h("span", {}, "Enviar no WhatsApp"));
+    wa.addEventListener("click", sendWhatsapp);
+    $("#pdf-send").before(wa);
   }
 
   function renderRank() {
@@ -585,6 +588,25 @@
     return { ids, cli, pr };
   }
 
+  function buildScopedPdf(sc) {
+    const e = S.eng, ids = NV.exporters.sortRows(e, sc.ids);
+    let clientLine = "", clientName = "";
+    if (sc.cli.size === 1 || sc.pr.size === 1) {
+      const c = S.p.cli[[...sc.cli][0]];
+      if (sc.cli.size === 1) { clientLine = `Cliente: ${c.n}  |  CNPJ/CPF: ${c.d}  |  ${c.y}`; clientName = c.n; }
+      else { const pr = S.p.pr[c.p]; clientLine = `Cliente principal: ${pr.n}`; clientName = pr.n; }
+    }
+    const { doc, filename } = NV.exporters.buildPdf({ eng: e, ids, sum: S.sum, user: S.user, periodText: periodText(), filtersText: filtersText(), clientLine, clientName });
+    return { doc, filename, clientName };
+  }
+
+  /* telefone do vendedor logado, no formato aceito pelo wa.me (com código do país) */
+  function waNumber() {
+    const d = NV.digits(S.user.telefone);
+    if (d.length < 10) return "";
+    return d.length <= 11 ? "55" + d : d;
+  }
+
   function openPdf() {
     if (!window.jspdf) return NV.toast("O gerador de PDF ainda está carregando. Tente de novo em instantes.", "err");
     S.pdf = pdfScope();
@@ -603,6 +625,7 @@
     $("#pdf-error").hidden = true;
     $("#pdf-send").textContent = hasEndpoint ? "Enviar PDF" : "Baixar PDF";
     $("#pdf-mailto").hidden = hasEndpoint;
+    $("#pdf-wa").title = waNumber() ? "" : "Seu telefone não está cadastrado — peça ao gerente para atualizar o usuarios.csv.";
     refreshPdfModal();
     $("#modal-pdf").showModal();
   }
@@ -617,10 +640,11 @@
     else if (!NV.remote.endpoint) msg = "O envio automático de e-mail ainda não foi configurado: o PDF será baixado para você anexar ao e-mail.";
     alert.textContent = msg; alert.hidden = !msg;
     $("#pdf-send").disabled = block; $("#pdf-mailto").disabled = block;
+    $("#pdf-wa").disabled = block || !waNumber();
   }
 
   async function sendPdf(openMail) {
-    const u = S.user, e = S.eng, sc = S.pdf, dest = $('input[name="pdf-dest"]:checked').value;
+    const u = S.user, sc = S.pdf, dest = $('input[name="pdf-dest"]:checked').value;
     const err = $("#pdf-error"); err.hidden = true;
     let to = u.email;
     if (dest === "client") {
@@ -634,18 +658,11 @@
     $("#pdf-send").textContent = NV.remote.endpoint ? "Enviando…" : "Gerando…";
     await new Promise((r) => setTimeout(r, 30));                       // deixa o navegador pintar o estado
     try {
-      const ids = NV.exporters.sortRows(e, sc.ids);
-      let clientLine = "", clientName = "";
-      if (sc.cli.size === 1 || sc.pr.size === 1) {
-        const c = S.p.cli[[...sc.cli][0]];
-        if (sc.cli.size === 1) { clientLine = `Cliente: ${c.n}  |  CNPJ/CPF: ${c.d}  |  ${c.y}`; clientName = c.n; }
-        else { const pr = S.p.pr[c.p]; clientLine = `Cliente principal: ${pr.n}`; clientName = pr.n; }
-      }
-      const { doc, filename } = NV.exporters.buildPdf({ eng: e, ids, sum: S.sum, user: u, periodText: periodText(), filtersText: filtersText(), clientLine, clientName });
+      const { doc, filename, clientName } = buildScopedPdf(sc);
       if (NV.remote.endpoint) {
         await NV.remote.sendEmail({ token: TOKEN, to, filename, pdf: NV.exporters.pdfBase64(doc), destino: dest,
           subject: "Histórico de compras — Novavet Distribuidora" + (clientName ? " — " + clientName : ""),
-          resumo: { registros: ids.length, clientes: sc.cli.size, periodo: periodText(), filtros: filtersText() } });
+          resumo: { registros: sc.ids.length, clientes: sc.cli.size, periodo: periodText(), filtros: filtersText() } });
         $("#modal-pdf").close();
         NV.toast("✅ E-mail enviado com sucesso!", "ok");
       } else {
@@ -660,6 +677,29 @@
       err.hidden = false;
     } finally {
       $("#pdf-send").textContent = label;
+      refreshPdfModal();
+    }
+  }
+
+  async function sendWhatsapp() {
+    const sc = S.pdf, num = waNumber();
+    if (!num) return NV.toast("Seu telefone não está cadastrado. Peça ao gerente para atualizar o usuarios.csv.", "err");
+    const btn = $("#pdf-wa"), span = btn.querySelector("span"), label = span.textContent;
+    btn.disabled = true; span.textContent = "Gerando…";
+    await new Promise((r) => setTimeout(r, 30));                       // deixa o navegador pintar o estado
+    try {
+      const { doc, filename, clientName } = buildScopedPdf(sc);
+      doc.save(filename);
+      const msg = `Histórico de compras — Novavet Distribuidora${clientName ? " — " + clientName : ""}\n\n` +
+        `Segue o histórico de compras. Anexe aqui o arquivo "${filename}" que acabou de ser baixado.`;
+      window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, "_blank");
+      $("#modal-pdf").close();
+      NV.toast("PDF baixado. Anexe o arquivo na conversa do WhatsApp que abriu.", "ok");
+    } catch (ex) {
+      console.error(ex);
+      NV.toast("Não foi possível gerar o PDF: " + (ex.message || "erro desconhecido") + ".", "err");
+    } finally {
+      span.textContent = label;
       refreshPdfModal();
     }
   }
