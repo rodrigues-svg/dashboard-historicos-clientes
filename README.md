@@ -83,10 +83,12 @@ responde ao RCA (reply-to) e o RCA recebe cópia (cc). Limite: 40 envios/dia/usu
 requisição exige o token pessoal. Enquanto não configurado, o botão **baixa o PDF** e abre o e-mail para anexar.
 O mesmo script grava o **log de acessos e envios** (aba `Log`), exibido no painel *Administração* do gerente.
 
-O modal também tem **Enviar no WhatsApp**: baixa o PDF e abre o WhatsApp Web/App já no chat do próprio vendedor
-logado (não do cliente — não há telefone de cliente cadastrado no sistema), com uma mensagem pronta; o WhatsApp não
-aceita anexo por link, então o vendedor precisa anexar o arquivo baixado manualmente. Usa o campo `telefone` de
-`usuarios.csv`; fica desabilitado se esse usuário não tiver telefone cadastrado.
+O modal também tem **Enviar no WhatsApp**. No celular (Android/iPhone, com o navegador suportando Web Share de
+arquivos), abre o menu nativo de compartilhar já com o PDF anexado — o vendedor só escolhe o WhatsApp e o contato.
+No computador (sem esse suporte), o WhatsApp não aceita anexo por link: o botão baixa o PDF e abre o WhatsApp
+Web/App no chat do próprio vendedor logado (não do cliente — não há telefone de cliente cadastrado no sistema) com
+uma mensagem pronta, e o vendedor anexa o arquivo baixado manualmente. Usa o campo `telefone` de `usuarios.csv` (só
+no caminho do computador); fica desabilitado se esse usuário não tiver telefone cadastrado.
 
 ## Renovar / revogar acessos
 

@@ -689,15 +689,22 @@
     await new Promise((r) => setTimeout(r, 30));                       // deixa o navegador pintar o estado
     try {
       const { doc, filename, clientName } = buildScopedPdf(sc);
-      doc.save(filename);
-      const msg = `Histórico de compras — Novavet Distribuidora${clientName ? " — " + clientName : ""}\n\n` +
-        `Segue o histórico de compras. Anexe aqui o arquivo "${filename}" que acabou de ser baixado.`;
-      window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, "_blank");
-      $("#modal-pdf").close();
-      NV.toast("PDF baixado. Anexe o arquivo na conversa do WhatsApp que abriu.", "ok");
+      const title = `Histórico de compras — Novavet Distribuidora${clientName ? " — " + clientName : ""}`;
+      const file = new File([doc.output("blob")], filename, { type: "application/pdf" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title, text: title });
+        $("#modal-pdf").close();
+        NV.toast("Escolha o WhatsApp na lista para enviar o PDF.", "ok");
+      } else {
+        doc.save(filename);
+        const msg = `${title}\n\nSegue o histórico de compras. Anexe aqui o arquivo "${filename}" que acabou de ser baixado.`;
+        window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, "_blank");
+        $("#modal-pdf").close();
+        NV.toast("PDF baixado. Anexe o arquivo na conversa do WhatsApp que abriu.", "ok");
+      }
     } catch (ex) {
-      console.error(ex);
-      NV.toast("Não foi possível gerar o PDF: " + (ex.message || "erro desconhecido") + ".", "err");
+      if (ex && ex.name === "AbortError") { /* usuário cancelou o compartilhamento */ }
+      else { console.error(ex); NV.toast("Não foi possível concluir: " + (ex.message || "erro desconhecido") + ".", "err"); }
     } finally {
       span.textContent = label;
       refreshPdfModal();
