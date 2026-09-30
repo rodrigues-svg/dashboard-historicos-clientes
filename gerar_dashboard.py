@@ -357,8 +357,14 @@ def preparar(df):
     d["tipo"] = df["Tipo Cliente"].astype(str).str.strip().str.upper().str[:1]
     d["cidade"] = df["Cidade Cliente"].astype(str).str.strip()
     d["bairro"] = df["Bairro Cliente"].astype(str).str.strip()
-    d["pr_cod"] = df["Código Cliente Principal"].astype("int64")
+    pr_raw = pd.to_numeric(df["Código Cliente Principal"], errors="coerce")
+    sem_principal = pr_raw.isna()                        # ex.: vem "(Null)" quando a planilha não tem o agrupamento
+    if sem_principal.any():
+        print(f"  AVISO: {int(sem_principal.sum())} linha(s) sem 'Cliente Principal' na planilha - "
+              "cada uma tratada como seu próprio cliente principal.")
+    d["pr_cod"] = pr_raw.fillna(d["cli_cod"]).astype("int64")
     d["pr_nome"] = df["Cliente Principal"].astype(str).str.strip()
+    d.loc[sem_principal, "pr_nome"] = d.loc[sem_principal, "cli_nome"]
     d["sup_cod"] = df["Descrição Supervisor"].astype(str).str.extract(r"^\s*(\d+)")[0].astype("int64")
     d["rca_cod"] = df["Descrição RCA"].astype(str).str.extract(r"^\s*(\d+)")[0].astype("int64")
     d["rca_nome_base"] = df["Descrição RCA"].astype(str).str.replace(r"^\s*\d+\s*-\s*", "", regex=True).str.title()
