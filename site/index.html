@@ -9,6 +9,12 @@
 <meta name="theme-color" content="#C94B5E">
 <title>Dashboard Consulta Históricos de Clientes</title>
 <link rel="icon" type="image/png" href="img/favicon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Novavet">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
@@ -226,6 +232,7 @@
         <li><button type="button" data-go="filters"><svg><use href="#i-filter"/></svg>Filtros avançados</button></li>
         <li><button type="button" data-go="pdf"><svg><use href="#i-mail"/></svg>Enviar histórico em PDF</button></li>
         <li><button type="button" data-go="csv"><svg><use href="#i-download"/></svg>Exportar CSV</button></li>
+        <li id="menu-install" hidden><button type="button" data-go="install"><svg><use href="#i-download"/></svg>Instalar aplicativo</button></li>
         <li id="menu-admin" hidden><button type="button" data-go="admin"><svg><use href="#i-shield"/></svg>Administração</button></li>
       </ul>
       <div class="menu-sec"><h3>Histórico de buscas</h3><ul class="hist-list" id="hist-list"></ul></div>
@@ -236,9 +243,24 @@
           <button type="button" data-t="dark" aria-pressed="false">Escuro</button>
         </div>
       </div>
-      <ul class="menu-list"><li><button type="button" data-go="logout"><svg><use href="#i-logout"/></svg>Sair</button></li></ul>
+      <ul class="menu-list">
+        <li><button type="button" data-go="logout"><svg><use href="#i-logout"/></svg>Sair</button></li>
+        <li><button type="button" data-go="forget"><svg><use href="#i-x"/></svg>Esquecer este aparelho</button></li>
+      </ul>
     </div>
   </aside>
+
+  <!-- instalar como aplicativo (quando o navegador não oferece o botão pronto) -->
+  <dialog id="modal-install" class="modal">
+    <div class="modal-in">
+      <h2>Instalar aplicativo</h2>
+      <p class="note"><b>iPhone / iPad (Safari):</b> toque em Compartilhar e depois em "Adicionar à Tela de Início". Faça isso com o seu link pessoal aberto.</p>
+      <p class="note"><b>Android (Chrome):</b> menu ⋮ e "Instalar aplicativo" (ou "Adicionar à tela inicial").</p>
+      <p class="note"><b>Computador (Chrome ou Edge):</b> ícone de instalar na barra de endereço, ou menu ⋮ e "Instalar Consulta Históricos de Clientes". No Safari do Mac: Arquivo e "Adicionar ao Dock".</p>
+      <p class="note">Depois de entrar uma vez com o link pessoal, o aplicativo abre sozinho neste aparelho; é só digitar e-mail e senha.</p>
+      <button class="btn btn-ghost btn-block" type="button" data-close>Fechar</button>
+    </div>
+  </dialog>
 
   <!-- ações (mobile) -->
   <dialog id="modal-actions" class="modal">

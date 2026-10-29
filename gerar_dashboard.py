@@ -588,6 +588,9 @@ def versionar_assets():
     novo, n = re.subn(r'((?:href|src)=")(?!https?:|//)([^"?#]+\.(?:css|js))(?:\?v=[^"]*)?"', rf'\1\2?v={versao}"', html)
     idx.write_text(novo, encoding="utf-8")
     print(f"  index.html: {n} arquivo(s) css/js carimbado(s) com a versão {versao}")
+    sw = SITE / "sw.js"                                   # a versão no service worker troca o cache a cada publicação
+    if sw.exists():
+        sw.write_text(re.sub(r'const VERSAO = "[^"]*";', f'const VERSAO = "{versao}";', sw.read_text(encoding="utf-8")), encoding="utf-8")
 
 
 def preparar_assets():
@@ -605,6 +608,17 @@ def preparar_assets():
     quadro = Image.new("RGB", (lado, lado), "white")
     quadro.paste(pata, ((lado - pata.width) // 2, (lado - pata.height) // 2))
     quadro.resize((128, 128), Image.LANCZOS).save(SITE / "img" / "favicon.png", optimize=True)
+
+    def icone(lado, ocupa):                                                   # patinha centralizada em fundo branco
+        fundo = Image.new("RGB", (lado, lado), "white")
+        p = pata.copy()
+        p.thumbnail((round(lado * ocupa),) * 2, Image.LANCZOS)
+        fundo.paste(p, ((lado - p.width) // 2, (lado - p.height) // 2))
+        return fundo
+    icone(192, .78).save(SITE / "img" / "icon-192.png", optimize=True)       # ícones do aplicativo instalável (PWA)
+    icone(512, .78).save(SITE / "img" / "icon-512.png", optimize=True)
+    icone(512, .56).save(SITE / "img" / "icon-maskable-512.png", optimize=True)   # área segura p/ ícone recortado (Android)
+    icone(180, .72).save(SITE / "img" / "apple-touch-icon.png", optimize=True)
     pdf = logo.resize((560, round(560 * logo.height / logo.width)), Image.LANCZOS)
     buf = io.BytesIO()
     pdf.save(buf, "PNG", optimize=True)

@@ -1,0 +1,17 @@
+{
+  "name": "Consulta Históricos de Clientes - Novavet",
+  "short_name": "Novavet",
+  "description": "Histórico de compras e comparativos de vendas da Novavet Distribuidora.",
+  "lang": "pt-BR",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F5F5F5",
+  "theme_color": "#C94B5E",
+  "icons": [
+    { "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "img/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

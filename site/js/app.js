@@ -3,7 +3,12 @@
   const NV = window.NV;
   const { h, icon, $, $$, fmt } = NV;
   const CFG = window.NV_CONFIG || {};
-  const TOKEN = new URLSearchParams(location.search).get("token") || "";
+  const params = new URLSearchParams(location.search);
+  /* o link pessoal traz o token; depois do 1º login ele fica guardado no aparelho (o app instalado abre sem o link).
+     Os dados continuam cifrados: para abrir ainda é preciso e-mail + senha de 4 dígitos */
+  const SAVED = NV.store.get("nv_device", null);
+  const TOKEN_URL = params.get("token") || "";
+  const TOKEN = TOKEN_URL || (SAVED && SAVED.t) || "";
   const isMobile = () => matchMedia("(max-width: 767px)").matches;
 
   const S = { p: null, eng: null, user: null, f: null, mk: null, mkPrev: null, sum: null, sumPrev: null,
@@ -26,11 +31,10 @@
   $("#foot-support").textContent = supportText ? "Suporte: " + supportText : "";
 
   const loginErr = (m) => { const e = $("#login-error"); e.textContent = m || ""; e.hidden = !m; };
-  const params = new URLSearchParams(location.search);
-  $("#login-email").value = params.get("user") || "";
+  $("#login-email").value = params.get("user") || (SAVED && SAVED.u) || "";
   if (!TOKEN) {
     const n = $("#login-invalid");
-    n.textContent = "Link inválido: falta o token de acesso. Use o link pessoal enviado pela Novavet.";
+    n.textContent = "Para usar neste aparelho, abra uma vez o link pessoal enviado pela Novavet.";
     n.hidden = false;
     $("#login-btn").disabled = true;
   }
@@ -55,9 +59,16 @@
     try {
       const p = await NV.auth.open(TOKEN, email, pin);
       fails = 0;
+      NV.store.set("nv_device", { t: TOKEN, u: email });
       start(p);
     } catch (e) {
-      if (e.code === "notfound") { const n = $("#login-invalid"); n.textContent = "Link inválido ou revogado. Peça um novo link ao gerente."; n.hidden = false; }
+      if (e.code === "notfound") {
+        const n = $("#login-invalid");
+        if (!TOKEN_URL) forgetStored();                                   // o acesso guardado não vale mais
+        n.textContent = TOKEN_URL ? "Link inválido ou revogado. Peça um novo link ao gerente."
+          : "Este aparelho não está mais autorizado. Abra o link pessoal mais recente enviado pela Novavet.";
+        n.hidden = false;
+      }
       else if (e.code === "unsupported") loginErr("Este navegador não é compatível. Use a versão atual do Chrome, Edge, Firefox ou Safari, com o site em HTTPS.");
       else if (e.code === "badcreds") {
         fails++;
@@ -78,6 +89,35 @@
       btn.disabled = !TOKEN; btn.textContent = "Entrar";
     }
   });
+
+  /* apaga o acesso guardado neste aparelho (token, e-mail e a cópia offline dos dados) */
+  function forgetStored() {
+    NV.store.set("nv_device", null);
+    if (window.caches) caches.delete("nv-dados").catch(() => {});
+  }
+
+  function forgetDevice() {
+    if (!confirm("Esquecer este aparelho? Para entrar de novo será preciso abrir o link pessoal enviado pela Novavet.")) return;
+    forgetStored();
+    location.replace(location.pathname);                     // recarrega sem o ?user=&token= do endereço
+  }
+
+  /* ================================================================ aplicativo instalável (PWA) */
+  let installEvt = null;
+  const standalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  addEventListener("beforeinstallprompt", (ev) => { ev.preventDefault(); installEvt = ev; });
+  addEventListener("appinstalled", () => { installEvt = null; $("#menu-install").hidden = true; });
+  $("#menu-install").hidden = standalone();
+  function installApp() {
+    if (installEvt) { installEvt.prompt(); installEvt = null; } else $("#modal-install").showModal();
+  }
+  if ("serviceWorker" in navigator) {
+    addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+    navigator.serviceWorker.addEventListener("message", (ev) => {
+      if (ev.data && ev.data.tipo === "dados-do-cache")
+        NV.toast("Sem conexão com o servidor: mostrando os últimos dados baixados neste aparelho (veja a data no rodapé).", "", 8000);
+    });
+  }
 
   function logout() {
     NV.charts.destroy();
@@ -601,6 +641,8 @@
       else if (go === "pdf") openPdf();
       else if (go === "csv") exportCsv();
       else if (go === "admin") openAdmin();
+      else if (go === "install") installApp();
+      else if (go === "forget") forgetDevice();
       else if (go === "logout") logout();
     }));
     $$("[data-copy]").forEach((b) => b.addEventListener("click", async () => {
