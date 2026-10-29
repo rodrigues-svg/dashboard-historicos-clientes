@@ -141,6 +141,39 @@
       return { ids, liq, qtd, venda, dev, last };
     }
 
+    /* totais de um intervalo de meses, sem filtros (painel de entrada).
+       pos = clientes CNPJ (tipo J) com valor líquido > 0; bonificado (itens com valor R$ 0) fica fora da positivação
+       e é separado em qtdB (qtdV = itens vendidos, líquidos de devolução) */
+    periodStats(lo, hi) {
+      const o = { venda: 0, liq: 0, pos: 0, qtdV: 0, qtdB: 0 };
+      if (hi < lo) return o;
+      const cliLiq = new Float64Array(this.nCli);
+      for (let i = 0; i < this.n; i++) {
+        const y = this.ym[i];
+        if (y < lo || y > hi) continue;
+        o.venda += this.venda[i]; o.liq += this.liq[i]; cliLiq[this.cli[i]] += this.liq[i];
+        if (Math.abs(this.venda[i]) < 0.005 && Math.abs(this.liq[i]) < 0.005 && this.qtd[i] > 0) o.qtdB += this.qtd[i];
+        else o.qtdV += this.qtd[i];
+      }
+      for (let c = 0; c < this.nCli; c++) if (cliLiq[c] > 0.005 && this.p.cli[c].t === "J") o.pos++;
+      return o;
+    }
+
+    /* clientes CNPJ que compraram de yearStart até ymCur, mas sem compra (valor líquido > 0) em ymCur */
+    semCompra(yearStart, ymCur) {
+      const ytd = new Float64Array(this.nCli), mon = new Float64Array(this.nCli);
+      for (let i = 0; i < this.n; i++) {
+        const y = this.ym[i];
+        if (y < yearStart || y > ymCur) continue;
+        const c = this.cli[i];
+        ytd[c] += this.liq[i];
+        if (y === ymCur) mon[c] += this.liq[i];
+      }
+      const out = [];
+      for (let c = 0; c < this.nCli; c++) if (this.p.cli[c].t === "J" && ytd[c] > 0.005 && mon[c] <= 0.005) out.push({ id: c, total: ytd[c] });
+      return out;
+    }
+
     rowIds(mk) {
       const out = new Array(mk.count);
       let k = 0;

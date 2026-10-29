@@ -87,6 +87,33 @@
   </header>
 
   <main class="content" id="top">
+    <!-- painel de entrada (não depende dos filtros abaixo) -->
+    <section id="home-card" class="card" aria-labelledby="home-title">
+      <div class="card-head">
+        <div><h2 id="home-title">Painel do mês</h2><p id="home-sub"></p></div>
+        <div class="head-tools"><button id="home-items-btn" class="btn btn-ghost btn-sm" type="button" aria-expanded="false" aria-controls="home-items">Ver itens</button></div>
+      </div>
+      <div class="home-body">
+        <div id="home-grid" class="home-grid"></div>
+        <div id="home-items" class="table-wrap" hidden></div>
+        <p id="home-note" class="note"></p>
+      </div>
+    </section>
+
+    <section id="miss-card" class="card" aria-labelledby="miss-title">
+      <div class="card-head">
+        <div><h2 id="miss-title"></h2><p id="miss-sub"></p></div>
+        <div class="head-tools">
+          <div class="seg" id="miss-sort" role="group" aria-label="Ordem da lista">
+            <button type="button" data-s="desc" aria-pressed="true">Maiores primeiro</button>
+            <button type="button" data-s="asc" aria-pressed="false">Menores primeiro</button>
+          </div>
+        </div>
+      </div>
+      <div id="miss-list"></div>
+      <div class="miss-foot"><button id="miss-more" class="btn btn-ghost btn-sm" type="button" hidden></button></div>
+    </section>
+
     <!-- filtros -->
     <section id="filters" class="card filters" aria-label="Filtros">
       <div class="filters-head">

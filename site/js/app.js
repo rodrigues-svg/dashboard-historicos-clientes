@@ -273,7 +273,7 @@
     buildFilters(); configureFilters(); buildRankTabs(); wireCard();
     $$("#metric-seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.m === "liq")));
     $$("#view-seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === "chart")));
-    renderFooter(); renderHist();
+    renderFooter(); renderHist(); renderHome();
     commit();
     NV.remote.logLogin(TOKEN);
   }
@@ -295,20 +295,22 @@
 
   const rangeText = (from, to) => (from === to ? fmt.ym(from) : fmt.ym(from) + " a " + fmt.ym(to));
 
+  /* chip ▲/▼ com a variação percentual; invert = quanto menor, melhor (ex.: devolução) */
+  function deltaChip(cur, old, invert) {
+    if (!old) return h("span", { class: "delta flat" }, "sem base anterior");
+    const d = ((cur - old) / Math.abs(old)) * 100;
+    const up = d > 0.05, down = d < -0.05;
+    const good = invert ? down : up, bad = invert ? up : down;
+    return h("span", { class: "delta " + (good ? "up" : bad ? "down" : "flat") }, up || down ? icon(up ? "i-up" : "i-down") : null, fmt.pctSigned(d));
+  }
+
   function renderKpis() {
     const s = S.sum, pv = S.sumPrev, f = S.f;
     const tile = (cls, label, value, key, invert) => {
       const kids = [h("div", { class: "k-label" }, h("i", {}), label), h("div", { class: "k-value" }, value)];
       if (pv) {
         const cur = s[key], old = pv[key];
-        let chip;
-        if (!old) chip = h("span", { class: "delta flat" }, "sem base anterior");
-        else {
-          const d = ((cur - old) / Math.abs(old)) * 100;
-          const up = d > 0.05, down = d < -0.05;
-          const good = invert ? down : up, bad = invert ? up : down;
-          chip = h("span", { class: "delta " + (good ? "up" : bad ? "down" : "flat") }, up || down ? icon(up ? "i-up" : "i-down") : null, fmt.pctSigned(d));
-        }
+        const chip = deltaChip(cur, old, invert);
         kids.push(h("div", { class: "k-delta" }, chip, h("span", {}, "vs " + rangeText(f.from - 12, f.to - 12) + ": " + (key === "qtd" || key === "clientes" ? fmt.int(old) : fmt.plain(fmt.brl(old))))));
       }
       return h("div", { class: "kpi " + cls }, kids);
@@ -321,6 +323,90 @@
       tile("k-sec", "Qtd. de itens", fmt.int(s.qtd), "qtd"),
       tile("k-sec", "Clientes positivados", fmt.int(s.clientes), "clientes"));
     $("#kpi-note").textContent = "Valor líquido = faturado, já descontadas as devoluções; pode diferir de Venda − Devolução quando pedidos são imputados e faturados em meses diferentes. Clientes positivados = clientes com valor líquido positivo no filtro.";
+  }
+
+  /* ================================================================ painel de entrada (não depende dos filtros) */
+  function renderHome() {
+    const e = S.eng, u = S.user, last = e.ymMax, year = Math.floor(last / 12), yStart = Math.max(year * 12, e.ymMin);
+    const gen = new Date(S.p.meta.geradoEm);
+    const parcial = gen.getFullYear() * 12 + gen.getMonth() === last;
+    const dias = gen.getDate(), diasMes = new Date(year, (last % 12) + 1, 0).getDate();
+    const frac = parcial ? Math.min(1, dias / diasMes) : 1;
+    const money = (v) => fmt.plain(fmt.brl(v));
+    const P = (lo, hi) => e.periodStats(lo, hi);
+    const zero = P(1, 0);
+    const mes = { cur: P(last, last), prev: P(last - 12, last - 12), prevA: zero };
+    const ytd = { cur: P(yStart, last), prev: P(yStart - 12, last - 12), prevA: P(yStart - 12, last - 13) };
+    /* ano anterior proporcional aos dias corridos: valor até o mês anterior + fração do mês em andamento */
+    const adj = (g, key) => g.prevA[key] + (g.prev[key] - g.prevA[key]) * frac;
+
+    $("#home-title").textContent = "Painel de " + fmt.ymFull(last);
+    $("#home-sub").textContent = (u.tipo === "RCA" ? "Sua carteira" : u.tipo === "Supervisor" ? "Sua equipe" : "Todas as equipes") + " · não muda com os filtros abaixo";
+
+    const defs = [
+      { key: "liq", label: "Valor líquido (faturado)", cls: "k-main", fv: money },
+      { key: "venda", label: "Venda (imputado)", cls: "", fv: money },
+      { key: "pos", label: "Positivação (CNPJ)", cls: "k-sec", fv: fmt.int },
+    ];
+    const tile = (d, g, prevLabel) => {
+      const cur = g.cur[d.key], old = g.prev[d.key];
+      const kids = [h("div", { class: "k-label" }, h("i", {}), d.label), h("div", { class: "k-value" }, d.fv(cur)),
+        h("div", { class: "k-delta" }, deltaChip(cur, old), h("span", {}, "vs " + d.fv(old) + " (" + prevLabel + ")"))];
+      if (frac < 1) {
+        const a = adj(g, d.key);
+        kids.push(h("div", { class: "k-delta est" }, h("span", { class: "est-tag" }, "Estimativa"), deltaChip(cur, a), h("span", {}, "vs " + d.fv(d.key === "pos" ? Math.round(a) : a) + " proporcional")));
+      }
+      return h("div", { class: "kpi " + d.cls }, kids);
+    };
+    const group = (title, sub, g, prevLabel) => h("div", { class: "home-per" },
+      h("h3", {}, title, h("small", {}, sub)), h("div", { class: "home-tiles" }, defs.map((d) => tile(d, g, prevLabel))));
+    $("#home-grid").replaceChildren(
+      group(fmt.ymFull(last) + (parcial ? " · em andamento" : ""), "contra " + fmt.ymFull(last - 12) + " (mês cheio)", mes, fmt.ym(last - 12)),
+      group("Acumulado do ano", `${NV.MESES_ABR[yStart % 12]}–${NV.MESES_ABR[last % 12]}/${year} contra o mesmo período de ${year - 1}`, ytd,
+        `${NV.MESES_ABR[yStart % 12]}–${NV.MESES_ABR[last % 12]}/${year - 1}`));
+    $("#home-note").textContent = "Valor líquido e venda somam todos os clientes; a positivação conta só CNPJ com valor líquido positivo (bonificado, que vem com valor R$ 0, não conta)." +
+      (frac < 1 ? ` Estimativa: o ano anterior é proporcionalizado pelos ${dias} de ${diasMes} dias corridos do mês, supondo vendas uniformes ao longo dele; na positivação é só uma aproximação.` : "");
+
+    /* itens (atrás de um botão) */
+    const n = (v) => fmt.int(v);
+    $("#home-items").replaceChildren(h("table", { class: "tbl" },
+      h("thead", {}, h("tr", {}, ["Itens", fmt.ymFull(last), fmt.ymFull(last - 12) + " (mês cheio)", "Acumulado " + year, "Acumulado " + (year - 1)]
+        .map((t, i) => h("th", { class: i ? "num" : "", style: "cursor:default" }, t)))),
+      h("tbody", {},
+        h("tr", {}, h("td", {}, "Vendidos (líquidos de devolução)"), h("td", { class: "num" }, n(mes.cur.qtdV)), h("td", { class: "num" }, n(mes.prev.qtdV)), h("td", { class: "num" }, n(ytd.cur.qtdV)), h("td", { class: "num" }, n(ytd.prev.qtdV))),
+        h("tr", {}, h("td", {}, "Bonificados"), h("td", { class: "num" }, n(mes.cur.qtdB)), h("td", { class: "num" }, n(mes.prev.qtdB)), h("td", { class: "num" }, n(ytd.cur.qtdB)), h("td", { class: "num" }, n(ytd.prev.qtdB))))));
+    $("#home-items").hidden = true;
+    const btn = $("#home-items-btn");
+    btn.setAttribute("aria-expanded", "false"); btn.textContent = "Ver itens";
+
+    S.miss = { all: e.semCompra(yStart, last), sort: "desc", full: false };
+    renderMiss();
+  }
+
+  /* clientes CNPJ que compraram no ano, mas ainda não no mês atual */
+  const MISS_TOP = 20;
+  function renderMiss() {
+    const m = S.miss, p = S.p, e = S.eng, last = e.ymMax, year = Math.floor(last / 12);
+    const list = m.all.slice().sort((a, b) => (m.sort === "desc" ? b.total - a.total : a.total - b.total) || a.id - b.id);
+    const sum = list.reduce((s, x) => s + x.total, 0);
+    $("#miss-title").textContent = "Ainda não compraram em " + fmt.ymFull(last);
+    $("#miss-sub").textContent = list.length
+      ? `${fmt.int(list.length)} cliente${list.length === 1 ? "" : "s"} CNPJ · ${fmt.plain(fmt.brl(sum))} comprados em ${year} até aqui · toque no cliente para ver o histórico`
+      : "";
+    $$("#miss-sort button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.s === m.sort)));
+    const box = $("#miss-list");
+    if (!list.length) { box.replaceChildren(h("div", { class: "empty" }, "Todos os clientes CNPJ que compraram em " + year + " já compraram em " + fmt.ymFull(last) + ".")); }
+    else {
+      const open = (id) => { S.f.clientes = new Set([id]); S.f.principais = new Set(); commit(); $("#detail-card").scrollIntoView({ behavior: "smooth" }); };
+      const rows = (m.full ? list : list.slice(0, MISS_TOP)).map((x) =>
+        h("tr", { class: "row", onclick: () => open(x.id) }, h("td", { class: "wrap" }, p.cli[x.id].n), h("td", { class: "num nowrap" }, fmt.plain(fmt.brl(x.total)))));
+      box.replaceChildren(h("div", { class: "table-wrap" + (m.full ? " miss-scroll" : "") }, h("table", { class: "tbl" },
+        h("thead", {}, h("tr", {}, h("th", { style: "cursor:default" }, "Razão social"), h("th", { class: "num", style: "cursor:default" }, "Comprado em " + year + " (líquido)"))),
+        h("tbody", {}, rows))));
+    }
+    const more = $("#miss-more");
+    more.hidden = list.length <= MISS_TOP;
+    more.textContent = m.full ? `Mostrar só os ${MISS_TOP} primeiros` : `Ver todos (${fmt.int(list.length)})`;
   }
 
   function chartData() {
@@ -407,6 +493,13 @@
     $$("#view-seg button").forEach((b) => b.addEventListener("click", () => {
       S.chartView = b.dataset.v; $$("#view-seg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); renderChart();
     }));
+    $("#home-items-btn").addEventListener("click", () => {
+      const b = $("#home-items-btn"), open = b.getAttribute("aria-expanded") !== "true";
+      b.setAttribute("aria-expanded", String(open)); b.textContent = open ? "Ocultar itens" : "Ver itens";
+      $("#home-items").hidden = !open;
+    });
+    $$("#miss-sort button").forEach((b) => b.addEventListener("click", () => { S.miss.sort = b.dataset.s; renderMiss(); }));
+    $("#miss-more").addEventListener("click", () => { S.miss.full = !S.miss.full; renderMiss(); });
     $("#btn-pdf").addEventListener("click", openPdf);
     $("#btn-csv").addEventListener("click", exportCsv);
     $("#btn-csv2").addEventListener("click", exportCsv);

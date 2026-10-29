@@ -242,6 +242,18 @@ select { min-width: 0; max-width: 100%; }
 .delta.flat { background: var(--line); color: var(--ink-2); }
 .note { font-size: 12px; color: var(--ink-3); margin: -4px 2px 0; }
 
+/* ---------- painel de entrada ---------- */
+.home-body { display: grid; gap: 16px; padding: 8px 18px 18px; }
+.home-per h3 { margin: 0 0 8px; font-size: 14px; }
+.home-per h3 small { margin-left: 8px; font-size: 12px; font-weight: 400; color: var(--ink-3); }
+.home-tiles { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.kpi.k-main { --kpi-accent: var(--primary); }
+.k-delta.est { margin-top: 6px; padding-top: 8px; border-top: 1px dashed var(--line-2); }
+.est-tag { font-size: 11px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--ink-2); }
+.miss-scroll { max-height: 440px; overflow: auto; }
+.miss-foot { display: flex; justify-content: center; padding: 8px 18px 16px; }
+.miss-foot:has(button[hidden]) { display: none; }
+
 /* ---------- gráfico ---------- */
 .seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: var(--zebra); border: 1px solid var(--line); }
 .seg button { min-height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--ink-2); }
@@ -369,6 +381,9 @@ code, .code { font: 12px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; 
   .topbar-actions { display: none; }
   .content { padding: 12px 12px 24px; gap: 12px; }
   .card-head { padding: 14px 14px 4px; } .card-body { padding: 6px 14px 14px; }
+  .home-body { padding: 6px 14px 14px; }
+  .home-tiles { grid-template-columns: 1fr; }
+  .home-per h3 small { display: block; margin: 2px 0 0; }
   .kpi { padding: 14px; } .kpi .k-value { font-size: 18px; letter-spacing: -.02em; }
   .kpi.hero .k-value { font-size: 32px; }
   /* filtros viram gaveta */
