@@ -562,11 +562,19 @@
     const posCell = (n) => n <= 3 ? h("span", { class: "pos p" + n }, icon("i-medal"), n) : h("span", { class: "pos" }, n);
     const money = (v) => h("span", { class: v < 0 ? "neg" : "" }, fmt.plain(fmt.brl(v)));
     /* colunas de comparação: R.g = período atual, R.gp = mesmo período do ano anterior (null se indisponível) */
+    /* abaixo desse valor no período anterior a variação % não é exibida (daria +26.000% sobre R$ 17, por exemplo) */
+    const VAR_BASE_MIN = 1000;
     const prevCols = (R) => [
       { key: "prev", label: "Mesmo período ano ant.", num: true, sort: (id) => (R.gp ? R.gp.liq[id] : 0), cell: (id) => (R.gp ? money(R.gp.liq[id]) : "—") },
       { key: "var", label: "Variação", num: true,
-        sort: (id) => (R.gp && R.gp.liq[id] > 0.005 ? (R.g.liq[id] - R.gp.liq[id]) / R.gp.liq[id] : -1e9),
-        cell: (id) => (!R.gp ? "—" : R.gp.liq[id] > 0.005 ? deltaChip(R.g.liq[id], R.gp.liq[id]) : h("span", { class: "muted" }, "sem base")) },
+        sort: (id) => (R.gp && R.gp.liq[id] >= VAR_BASE_MIN ? (R.g.liq[id] - R.gp.liq[id]) / R.gp.liq[id] : -1e9),
+        cell: (id) => {
+          if (!R.gp) return "—";
+          const old = R.gp.liq[id];
+          if (old >= VAR_BASE_MIN) return deltaChip(R.g.liq[id], old);
+          return h("span", { class: "muted", title: old > 0.005 ? `Período anterior abaixo de ${fmt.plain(fmt.brl(VAR_BASE_MIN))}: variação não exibida` : "Não houve compra no período anterior" },
+            old > 0.005 ? "base pequena" : "sem base");
+        } },
     ];
 
     if (tab === "rca") {
