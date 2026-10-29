@@ -367,10 +367,12 @@
   /* ================================================================ painel de entrada (não depende dos filtros) */
   /* dias corridos reais (planilha diária): mesmos dias do mês e do acumulado do ano, contra o ano anterior.
      Só vale com o mês em andamento (último dia da planilha antes do fim do mês); senão o mês cheio já é o comparável. */
-  function realDays(year, mo, diasMes, lab) {
+  function realDays(year, mo, diasMes, lab, rcaOk) {
     const dia = S.p.dia;
     if (!dia || !dia.fim) return null;
     const k = lab ? dia.f.indexOf(lab) : -1;                                  // lab = nome do laboratório ("" = todos)
+    const rcaIdx = new Map(S.p.rca.map((r, i) => [r.c, i]));
+    const rcOk = rcaOk ? dia.rc.map((c) => rcaIdx.has(c) && rcaOk[rcaIdx.get(c)] === 1) : null;   // por linha: RCA dentro do grupo escolhido
     const fy = Math.floor(dia.fim / 10000), fm = Math.floor(dia.fim / 100) % 100, fd = dia.fim % 100;
     if (fy !== year || fm !== mo + 1 || fd >= diasMes) return null;
     const dp = Math.min(fd, new Date(year - 1, mo + 1, 0).getDate());       // 29/02 vira 28/02 no ano anterior
@@ -378,7 +380,7 @@
     const sum = (lo, hi) => {
       let liq = 0, venda = 0;
       for (let i = 0; i < dia.d.length; i++) {
-        if (dia.d[i] < lo || dia.d[i] > hi || (lab && dia.k[i] !== k)) continue;
+        if (dia.d[i] < lo || dia.d[i] > hi || (lab && dia.k[i] !== k) || (rcOk && !rcOk[dia.r[i]])) continue;
         liq += dia.liq[i]; venda += dia.venda[i];
       }
       return { liq: liq / 100, venda: venda / 100 };
@@ -421,12 +423,13 @@
     const parcial = gen.getFullYear() * 12 + gen.getMonth() === last;
     const diasMes = new Date(year, (last % 12) + 1, 0).getDate();
     const forn = S.homeLab, labNome = forn >= 0 ? S.p.forn[forn] : "";       // laboratório escolhido no painel (-1 = todos)
-    const rd = realDays(year, last % 12, diasMes, labNome);
+    const rcaOk = homeRcaMask(), recorte = homeRecorte();                      // supervisor / RCA escolhidos no painel
+    const rd = realDays(year, last % 12, diasMes, labNome, rcaOk);
     /* dias com dados: o último dia da planilha diária; sem ela, o dia anterior à geração (o relatório sai de manhã com os dados até ontem) */
     const dias = rd ? rd.fd : Math.max(1, gen.getDate() - 1);
     const frac = parcial ? Math.min(1, dias / diasMes) : 1;
     const money = (v) => fmt.plain(fmt.brl(v));
-    const P = (lo, hi) => e.periodStats(lo, hi, forn);
+    const P = (lo, hi) => e.periodStats(lo, hi, forn, rcaOk);
     const zero = P(1, 0);
     const mes = { cur: P(last, last), prev: P(last - 12, last - 12), prevA: zero };
     const ytd = { cur: P(yStart, last), prev: P(yStart - 12, last - 12), prevA: P(yStart - 12, last - 13) };
@@ -434,7 +437,7 @@
     const adj = (g, key) => g.prevA[key] + (g.prev[key] - g.prevA[key]) * frac;
 
     $("#home-title").textContent = "Painel de " + fmt.ymFull(last);
-    $("#home-sub").textContent = (u.tipo === "RCA" ? "Sua carteira" : u.tipo === "Supervisor" ? "Sua equipe" : "Todas as equipes") +
+    $("#home-sub").textContent = (recorte ? recorte[0].toUpperCase() + recorte.slice(1) : u.tipo === "RCA" ? "Sua carteira" : u.tipo === "Supervisor" ? "Sua equipe" : "Todas as equipes") +
       (labNome ? " · " + labNome : "") + " · não muda com os filtros abaixo";
 
     const defs = [
@@ -468,7 +471,8 @@
         "contra " + fmt.ymFull(last - 12) + (rd ? ": mesmos dias e mês cheio" : " (mês cheio)"), mes, fmt.ym(last - 12), rd && rd.mes),
       group("Acumulado do ano", `${NV.MESES_ABR[yStart % 12]}–${NV.MESES_ABR[last % 12]}/${year} contra o mesmo período de ${year - 1}`, ytd,
         `${NV.MESES_ABR[yStart % 12]}–${NV.MESES_ABR[last % 12]}/${year - 1}`, rd && rd.ytd));
-    $("#home-note").textContent = (labNome ? `Só o laboratório ${labNome}. ` : "") + "Valor líquido e venda somam todos os clientes; a positivação conta só CNPJ com valor líquido positivo (bonificado, que vem com valor R$ 0, não conta)." +
+    const so = [recorte, labNome && "laboratório " + labNome].filter(Boolean).join(", ");
+    $("#home-note").textContent = (so ? `Só ${so}. ` : "") + "Valor líquido e venda somam todos os clientes; a positivação conta só CNPJ com valor líquido positivo (bonificado, que vem com valor R$ 0, não conta)." +
       (rd ? ` Mesmos dias: planilha diária, dia 1 até o dia ${rd.fd} deste mês contra o mesmo intervalo do ano anterior (dias corridos reais, sem estimativa). "Ano ant. fechado" mostra o período completo do ano anterior e quanto falta para igualá-lo.` : "") +
       (frac < 1 ? ` Estimativa${rd ? " (positivação, que não tem dado diário)" : ""}: o ano anterior é proporcionalizado pelos ${dias} de ${diasMes} dias corridos do mês, supondo vendas uniformes ao longo dele; é só uma aproximação.` : "");
 
@@ -482,17 +486,42 @@
         h("tr", {}, h("td", {}, "Bonificados"), h("td", { class: "num" }, n(mes.cur.qtdB)), h("td", { class: "num" }, n(mes.prev.qtdB)), h("td", { class: "num" }, n(ytd.cur.qtdB)), h("td", { class: "num" }, n(ytd.prev.qtdB))))));
     $("#home-items").hidden = $("#home-items-btn").getAttribute("aria-expanded") !== "true";
 
-    S.miss = { all: e.semCompra(yStart, last, forn), sort: S.miss ? S.miss.sort : "desc", full: false };
+    S.miss = { all: e.semCompra(yStart, last, forn, rcaOk), sort: S.miss ? S.miss.sort : "desc", full: false };
     renderMiss();
   }
 
-  /* seletor de laboratório do painel de entrada: começa em "todos"; some quando o escopo só tem um laboratório */
+  /* RCAs marcados no painel de entrada (null = todos): um RCA, ou todos os de um supervisor */
+  function homeRcaMask() {
+    const e = S.eng;
+    if (S.homeRca < 0 && S.homeSup < 0) return null;
+    const m = new Uint8Array(e.nRca);
+    if (S.homeRca >= 0) m[S.homeRca] = 1;
+    else for (let i = 0; i < e.nRca; i++) if (e.rcaSup[i] === S.homeSup) m[i] = 1;
+    return m;
+  }
+  const homeRecorte = () => (S.homeRca >= 0 ? "RCA " + S.p.rca[S.homeRca].n : S.homeSup >= 0 ? "equipe de " + S.p.sup[S.homeSup].n : "");
+
+  /* lista de RCAs do seletor: só os do supervisor escolhido (se houver) */
+  function fillHomeRca() {
+    const p = S.p, e = S.eng, sel = $("#home-rca");
+    const ids = p.rca.map((_, i) => i).filter((i) => S.homeSup < 0 || e.rcaSup[i] === S.homeSup);
+    sel.replaceChildren(h("option", { value: "-1" }, "Todos os RCAs"), ...ids.map((i) => h("option", { value: String(i) }, p.rca[i].n)));
+    sel.value = String(S.homeRca);
+  }
+
+  /* seletores do painel de entrada (supervisor, RCA, laboratório): começam em "todos" e só aparecem quando há o que escolher */
   function setupHomeLab() {
-    const sel = $("#home-lab"), forn = S.p.forn;
-    S.homeLab = -1;
-    sel.replaceChildren(h("option", { value: "-1" }, "Todos os laboratórios"), ...forn.map((n, i) => h("option", { value: String(i) }, n)));
-    sel.value = "-1";
+    const p = S.p, forn = p.forn;
+    S.homeLab = -1; S.homeSup = -1; S.homeRca = -1;
+    const lab = $("#home-lab"), sup = $("#home-sup");
+    lab.replaceChildren(h("option", { value: "-1" }, "Todos os laboratórios"), ...forn.map((n, i) => h("option", { value: String(i) }, n)));
+    lab.value = "-1";
+    sup.replaceChildren(h("option", { value: "-1" }, "Todos os supervisores"), ...p.sup.map((s, i) => h("option", { value: String(i) }, s.n)));
+    sup.value = "-1";
+    fillHomeRca();
     $("#home-lab-wrap").hidden = forn.length < 2;
+    $("#home-sup-wrap").hidden = p.sup.length < 2;
+    $("#home-rca-wrap").hidden = p.rca.length < 2;
     const btn = $("#home-items-btn");
     btn.setAttribute("aria-expanded", "false"); btn.textContent = "Ver itens";
     S.miss = null;
@@ -504,14 +533,14 @@
     const m = S.miss, p = S.p, e = S.eng, last = e.ymMax, year = Math.floor(last / 12);
     const list = m.all.slice().sort((a, b) => (m.sort === "desc" ? b.total - a.total : a.total - b.total) || a.id - b.id);
     const sum = list.reduce((s, x) => s + x.total, 0);
-    const lab = S.homeLab >= 0 ? p.forn[S.homeLab] : "";                      // segue o laboratório escolhido no painel
+    const lab = S.homeLab >= 0 ? p.forn[S.homeLab] : "", rec = homeRecorte();   // segue o laboratório, supervisor e RCA do painel
     $("#miss-title").textContent = "Ainda não compraram " + (lab ? lab + " " : "") + "em " + fmt.ymFull(last);
     $("#miss-sub").textContent = list.length
-      ? `${fmt.int(list.length)} cliente${list.length === 1 ? "" : "s"} CNPJ · ${fmt.plain(fmt.brl(sum))} comprados${lab ? " de " + lab : ""} em ${year} até aqui · toque no cliente para ver o histórico`
+      ? `${fmt.int(list.length)} cliente${list.length === 1 ? "" : "s"} CNPJ · ${fmt.plain(fmt.brl(sum))} comprados${lab ? " de " + lab : ""}${rec ? " (" + rec + ")" : ""} em ${year} até aqui · toque no cliente para ver o histórico`
       : "";
     $$("#miss-sort button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.s === m.sort)));
     const box = $("#miss-list");
-    if (!list.length) { box.replaceChildren(h("div", { class: "empty" }, "Todos os clientes CNPJ que compraram" + (lab ? " " + lab : "") + " em " + year + " já compraram em " + fmt.ymFull(last) + ".")); }
+    if (!list.length) { box.replaceChildren(h("div", { class: "empty" }, "Todos os clientes CNPJ que compraram" + (lab ? " " + lab : "") + (rec ? " (" + rec + ")" : "") + " em " + year + " já compraram em " + fmt.ymFull(last) + ".")); }
     else {
       const open = (id) => { S.f.clientes = new Set([id]); S.f.principais = new Set(); commit(); $("#detail-card").scrollIntoView({ behavior: "smooth" }); };
       const rows = (m.full ? list : list.slice(0, MISS_TOP)).map((x) =>
@@ -610,6 +639,12 @@
       S.chartView = b.dataset.v; $$("#view-seg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); renderChart();
     }));
     $("#home-lab").addEventListener("change", (ev) => { S.homeLab = +ev.target.value; renderHome(); });
+    $("#home-sup").addEventListener("change", (ev) => {
+      S.homeSup = +ev.target.value;
+      if (S.homeRca >= 0 && S.homeSup >= 0 && S.eng.rcaSup[S.homeRca] !== S.homeSup) S.homeRca = -1;   // o RCA escolhido é de outra equipe
+      fillHomeRca(); renderHome();
+    });
+    $("#home-rca").addEventListener("change", (ev) => { S.homeRca = +ev.target.value; renderHome(); });
     $("#home-items-btn").addEventListener("click", () => {
       const b = $("#home-items-btn"), open = b.getAttribute("aria-expanded") !== "true";
       b.setAttribute("aria-expanded", String(open)); b.textContent = open ? "Ocultar itens" : "Ver itens";

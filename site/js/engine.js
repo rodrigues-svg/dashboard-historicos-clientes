@@ -143,8 +143,9 @@
 
     /* totais de um intervalo de meses, sem filtros (painel de entrada).
        pos = clientes CNPJ (tipo J) com valor líquido > 0; bonificado (itens com valor R$ 0) fica fora da positivação
-       e é separado em qtdB (qtdV = itens vendidos, líquidos de devolução); forn >= 0 restringe a um laboratório */
-    periodStats(lo, hi, forn = -1) {
+       e é separado em qtdB (qtdV = itens vendidos, líquidos de devolução); forn >= 0 restringe a um laboratório e
+       rcaOk (Uint8Array por RCA) restringe a um grupo de RCAs */
+    periodStats(lo, hi, forn = -1, rcaOk = null) {
       const o = { venda: 0, liq: 0, pos: 0, qtdV: 0, qtdB: 0 };
       if (hi < lo) return o;
       const cliLiq = new Float64Array(this.nCli);
@@ -152,6 +153,7 @@
         const y = this.ym[i];
         if (y < lo || y > hi) continue;
         if (forn >= 0 && this.prodForn[this.prod[i]] !== forn) continue;
+        if (rcaOk && !rcaOk[this.rca[i]]) continue;
         o.venda += this.venda[i]; o.liq += this.liq[i]; cliLiq[this.cli[i]] += this.liq[i];
         if (Math.abs(this.venda[i]) < 0.005 && Math.abs(this.liq[i]) < 0.005 && this.qtd[i] > 0) o.qtdB += this.qtd[i];
         else o.qtdV += this.qtd[i];
@@ -160,13 +162,15 @@
       return o;
     }
 
-    /* clientes CNPJ que compraram de yearStart até ymCur, mas sem compra (valor líquido > 0) em ymCur; forn >= 0 = só aquele laboratório */
-    semCompra(yearStart, ymCur, forn = -1) {
+    /* clientes CNPJ que compraram de yearStart até ymCur, mas sem compra (valor líquido > 0) em ymCur; forn >= 0 = só
+       aquele laboratório; rcaOk = só as compras feitas pelos RCAs marcados */
+    semCompra(yearStart, ymCur, forn = -1, rcaOk = null) {
       const ytd = new Float64Array(this.nCli), mon = new Float64Array(this.nCli);
       for (let i = 0; i < this.n; i++) {
         const y = this.ym[i];
         if (y < yearStart || y > ymCur) continue;
         if (forn >= 0 && this.prodForn[this.prod[i]] !== forn) continue;
+        if (rcaOk && !rcaOk[this.rca[i]]) continue;
         const c = this.cli[i];
         ytd[c] += this.liq[i];
         if (y === ymCur) mon[c] += this.liq[i];
