@@ -273,7 +273,7 @@
     buildFilters(); configureFilters(); buildRankTabs(); wireCard();
     $$("#metric-seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.m === "liq")));
     $$("#view-seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === "chart")));
-    renderFooter(); renderHist(); renderHome();
+    renderFooter(); renderHist(); setupHomeLab(); renderHome();
     commit();
     NV.remote.logLogin(TOKEN);
   }
@@ -282,6 +282,8 @@
     const m = S.p.meta, d = new Date(m.geradoEm), last = S.eng.ymMax;
     const now = new Date(), parcial = now.getFullYear() * 12 + now.getMonth() === last;
     $("#foot-updated").textContent = `Dados atualizados em ${fmt.date(d)} (${m.fonte}) · último mês: ${fmt.ymFull(last)}${parcial ? " (em andamento)" : ""}`;
+    const dia = S.p.dia;
+    if (dia && dia.fim) $("#foot-updated").textContent += ` · comparação por dias: planilha diária até ${String(dia.fim % 100).padStart(2, "0")}/${String(Math.floor(dia.fim / 100) % 100).padStart(2, "0")}`;
   }
 
   /* ================================================================ cálculo + render */
@@ -323,14 +325,68 @@
   }
 
   /* ================================================================ painel de entrada (não depende dos filtros) */
+  /* dias corridos reais (planilha diária): mesmos dias do mês e do acumulado do ano, contra o ano anterior.
+     Só vale com o mês em andamento (último dia da planilha antes do fim do mês); senão o mês cheio já é o comparável. */
+  function realDays(year, mo, diasMes, lab) {
+    const dia = S.p.dia;
+    if (!dia || !dia.fim) return null;
+    const k = lab ? dia.f.indexOf(lab) : -1;                                  // lab = nome do laboratório ("" = todos)
+    const fy = Math.floor(dia.fim / 10000), fm = Math.floor(dia.fim / 100) % 100, fd = dia.fim % 100;
+    if (fy !== year || fm !== mo + 1 || fd >= diasMes) return null;
+    const dp = Math.min(fd, new Date(year - 1, mo + 1, 0).getDate());       // 29/02 vira 28/02 no ano anterior
+    const ymd = (y, m, d) => y * 10000 + (m + 1) * 100 + d;
+    const sum = (lo, hi) => {
+      let liq = 0, venda = 0;
+      for (let i = 0; i < dia.d.length; i++) {
+        if (dia.d[i] < lo || dia.d[i] > hi || (lab && dia.k[i] !== k)) continue;
+        liq += dia.liq[i]; venda += dia.venda[i];
+      }
+      return { liq: liq / 100, venda: venda / 100 };
+    };
+    const z = (n) => String(n).padStart(2, "0"), mm = z(mo + 1);
+    return {
+      fd, dp,
+      mes: { cur: sum(ymd(year, mo, 1), dia.fim), prev: sum(ymd(year - 1, mo, 1), ymd(year - 1, mo, dp)),
+        tag: `1–${fd}/${mm}`, prevTag: `1–${dp}/${mm}/${year - 1}` },
+      ytd: { cur: sum(ymd(year, 0, 1), dia.fim), prev: sum(ymd(year - 1, 0, 1), ymd(year - 1, mo, dp)),
+        tag: `01/01–${z(fd)}/${mm}`, prevTag: `01/01–${z(dp)}/${mm}/${year - 1}` },
+    };
+  }
+
+  /* ranking de RCAs: valor líquido do mesmo período do ano anterior, com o mês em andamento só até o mesmo dia
+     (planilha diária; respeita supervisor, RCA, laboratório e meses do filtro). rd = resultado de realDays */
+  function rcaPrevDaily(rd) {
+    const e = S.eng, p = S.p, f = S.f, dia = p.dia;
+    const ok = e.allowed(f).rca;
+    const labOk = f.labs.size ? dia.f.map((n) => f.labs.has(p.forn.indexOf(n))) : null;
+    const idx = new Map(p.rca.map((r, i) => [r.c, i]));
+    const lo = (Math.floor(f.from / 12) - 1) * 10000 + ((f.from % 12) + 1) * 100 + 1;
+    const hi = (Math.floor(f.to / 12) - 1) * 10000 + ((f.to % 12) + 1) * 100 + rd.dp;
+    const liq = new Float64Array(e.nRca);
+    for (let i = 0; i < dia.d.length; i++) {
+      const d = dia.d[i];
+      if (d < lo || d > hi) continue;
+      if (f.months.size && !f.months.has((Math.floor(d / 100) % 100) - 1)) continue;
+      if (labOk && !labOk[dia.k[i]]) continue;
+      const r = idx.get(dia.rc[dia.r[i]]);
+      if (r !== undefined && ok[r]) liq[r] += dia.liq[i];
+    }
+    for (let r = 0; r < liq.length; r++) liq[r] /= 100;
+    return { liq };
+  }
+
   function renderHome() {
     const e = S.eng, u = S.user, last = e.ymMax, year = Math.floor(last / 12), yStart = Math.max(year * 12, e.ymMin);
     const gen = new Date(S.p.meta.geradoEm);
     const parcial = gen.getFullYear() * 12 + gen.getMonth() === last;
-    const dias = gen.getDate(), diasMes = new Date(year, (last % 12) + 1, 0).getDate();
+    const diasMes = new Date(year, (last % 12) + 1, 0).getDate();
+    const forn = S.homeLab, labNome = forn >= 0 ? S.p.forn[forn] : "";       // laboratório escolhido no painel (-1 = todos)
+    const rd = realDays(year, last % 12, diasMes, labNome);
+    /* dias com dados: o último dia da planilha diária; sem ela, o dia anterior à geração (o relatório sai de manhã com os dados até ontem) */
+    const dias = rd ? rd.fd : Math.max(1, gen.getDate() - 1);
     const frac = parcial ? Math.min(1, dias / diasMes) : 1;
     const money = (v) => fmt.plain(fmt.brl(v));
-    const P = (lo, hi) => e.periodStats(lo, hi);
+    const P = (lo, hi) => e.periodStats(lo, hi, forn);
     const zero = P(1, 0);
     const mes = { cur: P(last, last), prev: P(last - 12, last - 12), prevA: zero };
     const ytd = { cur: P(yStart, last), prev: P(yStart - 12, last - 12), prevA: P(yStart - 12, last - 13) };
@@ -338,31 +394,43 @@
     const adj = (g, key) => g.prevA[key] + (g.prev[key] - g.prevA[key]) * frac;
 
     $("#home-title").textContent = "Painel de " + fmt.ymFull(last);
-    $("#home-sub").textContent = (u.tipo === "RCA" ? "Sua carteira" : u.tipo === "Supervisor" ? "Sua equipe" : "Todas as equipes") + " · não muda com os filtros abaixo";
+    $("#home-sub").textContent = (u.tipo === "RCA" ? "Sua carteira" : u.tipo === "Supervisor" ? "Sua equipe" : "Todas as equipes") +
+      (labNome ? " · " + labNome : "") + " · não muda com os filtros abaixo";
 
     const defs = [
       { key: "liq", label: "Valor líquido (faturado)", cls: "k-main", fv: money },
       { key: "venda", label: "Venda (imputado)", cls: "", fv: money },
       { key: "pos", label: "Positivação (CNPJ)", cls: "k-sec", fv: fmt.int },
     ];
-    const tile = (d, g, prevLabel) => {
+    /* g = totais do analítico (mês/acumulado); r = mesmos dias reais da planilha diária (só valor líquido e venda) */
+    const tile = (d, g, prevLabel, r) => {
       const cur = g.cur[d.key], old = g.prev[d.key];
-      const kids = [h("div", { class: "k-label" }, h("i", {}), d.label), h("div", { class: "k-value" }, d.fv(cur)),
-        h("div", { class: "k-delta" }, deltaChip(cur, old), h("span", {}, "vs " + d.fv(old) + " (" + prevLabel + ")"))];
+      const kids = [h("div", { class: "k-label" }, h("i", {}), d.label), h("div", { class: "k-value" }, d.fv(cur))];
+      if (r && d.key !== "pos") {
+        kids.push(
+          h("div", { class: "k-delta" }, h("span", { class: "est-tag" }, "Mesmos dias " + r.tag), deltaChip(r.cur[d.key], r.prev[d.key]),
+            h("span", {}, "vs " + d.fv(r.prev[d.key]) + " (" + r.prevTag + ")")),
+          h("div", { class: "k-delta est" }, h("span", { class: "est-tag" }, "Ano ant. fechado"),
+            h("span", {}, d.fv(old) + " (" + prevLabel + ") · " + (cur >= old ? "já superado em " + d.fv(cur - old) : "faltam " + d.fv(old - cur) + " para igualar"))));
+        return h("div", { class: "kpi " + d.cls }, kids);
+      }
+      kids.push(h("div", { class: "k-delta" }, deltaChip(cur, old), h("span", {}, "vs " + d.fv(old) + " (" + prevLabel + ")")));
       if (frac < 1) {
         const a = adj(g, d.key);
         kids.push(h("div", { class: "k-delta est" }, h("span", { class: "est-tag" }, "Estimativa"), deltaChip(cur, a), h("span", {}, "vs " + d.fv(d.key === "pos" ? Math.round(a) : a) + " proporcional")));
       }
       return h("div", { class: "kpi " + d.cls }, kids);
     };
-    const group = (title, sub, g, prevLabel) => h("div", { class: "home-per" },
-      h("h3", {}, title, h("small", {}, sub)), h("div", { class: "home-tiles" }, defs.map((d) => tile(d, g, prevLabel))));
+    const group = (title, sub, g, prevLabel, r) => h("div", { class: "home-per" },
+      h("h3", {}, title, h("small", {}, sub)), h("div", { class: "home-tiles" }, defs.map((d) => tile(d, g, prevLabel, r))));
     $("#home-grid").replaceChildren(
-      group(fmt.ymFull(last) + (parcial ? " · em andamento" : ""), "contra " + fmt.ymFull(last - 12) + " (mês cheio)", mes, fmt.ym(last - 12)),
+      group(fmt.ymFull(last) + (parcial ? " · em andamento" : ""),
+        "contra " + fmt.ymFull(last - 12) + (rd ? ": mesmos dias e mês cheio" : " (mês cheio)"), mes, fmt.ym(last - 12), rd && rd.mes),
       group("Acumulado do ano", `${NV.MESES_ABR[yStart % 12]}–${NV.MESES_ABR[last % 12]}/${year} contra o mesmo período de ${year - 1}`, ytd,
-        `${NV.MESES_ABR[yStart % 12]}–${NV.MESES_ABR[last % 12]}/${year - 1}`));
-    $("#home-note").textContent = "Valor líquido e venda somam todos os clientes; a positivação conta só CNPJ com valor líquido positivo (bonificado, que vem com valor R$ 0, não conta)." +
-      (frac < 1 ? ` Estimativa: o ano anterior é proporcionalizado pelos ${dias} de ${diasMes} dias corridos do mês, supondo vendas uniformes ao longo dele; na positivação é só uma aproximação.` : "");
+        `${NV.MESES_ABR[yStart % 12]}–${NV.MESES_ABR[last % 12]}/${year - 1}`, rd && rd.ytd));
+    $("#home-note").textContent = (labNome ? `Só o laboratório ${labNome}. ` : "") + "Valor líquido e venda somam todos os clientes; a positivação conta só CNPJ com valor líquido positivo (bonificado, que vem com valor R$ 0, não conta)." +
+      (rd ? ` Mesmos dias: planilha diária, dia 1 até o dia ${rd.fd} deste mês contra o mesmo intervalo do ano anterior (dias corridos reais, sem estimativa). "Ano ant. fechado" mostra o período completo do ano anterior e quanto falta para igualá-lo.` : "") +
+      (frac < 1 ? ` Estimativa${rd ? " (positivação, que não tem dado diário)" : ""}: o ano anterior é proporcionalizado pelos ${dias} de ${diasMes} dias corridos do mês, supondo vendas uniformes ao longo dele; é só uma aproximação.` : "");
 
     /* itens (atrás de um botão) */
     const n = (v) => fmt.int(v);
@@ -372,12 +440,22 @@
       h("tbody", {},
         h("tr", {}, h("td", {}, "Vendidos (líquidos de devolução)"), h("td", { class: "num" }, n(mes.cur.qtdV)), h("td", { class: "num" }, n(mes.prev.qtdV)), h("td", { class: "num" }, n(ytd.cur.qtdV)), h("td", { class: "num" }, n(ytd.prev.qtdV))),
         h("tr", {}, h("td", {}, "Bonificados"), h("td", { class: "num" }, n(mes.cur.qtdB)), h("td", { class: "num" }, n(mes.prev.qtdB)), h("td", { class: "num" }, n(ytd.cur.qtdB)), h("td", { class: "num" }, n(ytd.prev.qtdB))))));
-    $("#home-items").hidden = true;
+    $("#home-items").hidden = $("#home-items-btn").getAttribute("aria-expanded") !== "true";
+
+    S.miss = { all: e.semCompra(yStart, last, forn), sort: S.miss ? S.miss.sort : "desc", full: false };
+    renderMiss();
+  }
+
+  /* seletor de laboratório do painel de entrada: começa em "todos"; some quando o escopo só tem um laboratório */
+  function setupHomeLab() {
+    const sel = $("#home-lab"), forn = S.p.forn;
+    S.homeLab = -1;
+    sel.replaceChildren(h("option", { value: "-1" }, "Todos os laboratórios"), ...forn.map((n, i) => h("option", { value: String(i) }, n)));
+    sel.value = "-1";
+    $("#home-lab-wrap").hidden = forn.length < 2;
     const btn = $("#home-items-btn");
     btn.setAttribute("aria-expanded", "false"); btn.textContent = "Ver itens";
-
-    S.miss = { all: e.semCompra(yStart, last), sort: "desc", full: false };
-    renderMiss();
+    S.miss = null;
   }
 
   /* clientes CNPJ que compraram no ano, mas ainda não no mês atual */
@@ -386,19 +464,20 @@
     const m = S.miss, p = S.p, e = S.eng, last = e.ymMax, year = Math.floor(last / 12);
     const list = m.all.slice().sort((a, b) => (m.sort === "desc" ? b.total - a.total : a.total - b.total) || a.id - b.id);
     const sum = list.reduce((s, x) => s + x.total, 0);
-    $("#miss-title").textContent = "Ainda não compraram em " + fmt.ymFull(last);
+    const lab = S.homeLab >= 0 ? p.forn[S.homeLab] : "";                      // segue o laboratório escolhido no painel
+    $("#miss-title").textContent = "Ainda não compraram " + (lab ? lab + " " : "") + "em " + fmt.ymFull(last);
     $("#miss-sub").textContent = list.length
-      ? `${fmt.int(list.length)} cliente${list.length === 1 ? "" : "s"} CNPJ · ${fmt.plain(fmt.brl(sum))} comprados em ${year} até aqui · toque no cliente para ver o histórico`
+      ? `${fmt.int(list.length)} cliente${list.length === 1 ? "" : "s"} CNPJ · ${fmt.plain(fmt.brl(sum))} comprados${lab ? " de " + lab : ""} em ${year} até aqui · toque no cliente para ver o histórico`
       : "";
     $$("#miss-sort button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.s === m.sort)));
     const box = $("#miss-list");
-    if (!list.length) { box.replaceChildren(h("div", { class: "empty" }, "Todos os clientes CNPJ que compraram em " + year + " já compraram em " + fmt.ymFull(last) + ".")); }
+    if (!list.length) { box.replaceChildren(h("div", { class: "empty" }, "Todos os clientes CNPJ que compraram" + (lab ? " " + lab : "") + " em " + year + " já compraram em " + fmt.ymFull(last) + ".")); }
     else {
       const open = (id) => { S.f.clientes = new Set([id]); S.f.principais = new Set(); commit(); $("#detail-card").scrollIntoView({ behavior: "smooth" }); };
       const rows = (m.full ? list : list.slice(0, MISS_TOP)).map((x) =>
         h("tr", { class: "row", onclick: () => open(x.id) }, h("td", { class: "wrap" }, p.cli[x.id].n), h("td", { class: "num nowrap" }, fmt.plain(fmt.brl(x.total)))));
       box.replaceChildren(h("div", { class: "table-wrap" + (m.full ? " miss-scroll" : "") }, h("table", { class: "tbl" },
-        h("thead", {}, h("tr", {}, h("th", { style: "cursor:default" }, "Razão social"), h("th", { class: "num", style: "cursor:default" }, "Comprado em " + year + " (líquido)"))),
+        h("thead", {}, h("tr", {}, h("th", { style: "cursor:default" }, "Razão social"), h("th", { class: "num", style: "cursor:default" }, "Comprado em " + year + " (líquido" + (lab ? ", " + lab : "") + ")"))),
         h("tbody", {}, rows))));
     }
     const more = $("#miss-more");
@@ -490,6 +569,7 @@
     $$("#view-seg button").forEach((b) => b.addEventListener("click", () => {
       S.chartView = b.dataset.v; $$("#view-seg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); renderChart();
     }));
+    $("#home-lab").addEventListener("change", (ev) => { S.homeLab = +ev.target.value; renderHome(); });
     $("#home-items-btn").addEventListener("click", () => {
       const b = $("#home-items-btn"), open = b.getAttribute("aria-expanded") !== "true";
       b.setAttribute("aria-expanded", String(open)); b.textContent = open ? "Ocultar itens" : "Ver itens";
@@ -544,10 +624,18 @@
     const hasPrev = f.from - 12 >= e.ymMin;
     const mkPrev = hasPrev ? e.mask(f, -12) : null;
     const filtros = filtersText();
+    /* o período inclui o mês em andamento? então o ano anterior só é comparável até o mesmo dia (planilha diária, só por RCA) */
+    const gen = new Date(S.p.meta.geradoEm), year = Math.floor(e.ymMax / 12), mo = e.ymMax % 12;
+    const incMes = hasPrev && gen.getFullYear() * 12 + gen.getMonth() === e.ymMax && f.to === e.ymMax && (!f.months.size || f.months.has(mo));
+    const rd = incMes ? realDays(year, mo, new Date(year, mo + 1, 0).getDate(), "") : null;
+    const semDiario = f.tipo || f.clientes.size || f.principais.size || f.prods.size;      // filtros que a planilha diária não tem
+    const rcaDias = rd && tab === "rca" && !semDiario ? rd : null;
+    const nota = !incMes ? "" : rcaDias ? ` (${NV.MESES_ABR[mo]}/${year - 1} só até o dia ${rd.dp}, dias corridos reais)`
+      : " · período anterior inteiro (" + (tab === "cli" ? "sem dado diário por cliente" : rd && semDiario ? "a planilha diária não filtra por cliente, tipo ou produto" : "sem planilha diária") + ")";
     $$("#rank-tabs button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.r === tab)));
     $("#rank-title").textContent = tab === "rca" ? "Ranking de RCAs" : "Ranking de clientes";
     $("#rank-sub").textContent = "Ordenado por valor líquido · " + rangeText(f.from, f.to) +
-      (hasPrev ? " · comparado com " + rangeText(f.from - 12, f.to - 12) : " · sem o período anterior completo na base") +
+      (hasPrev ? " · comparado com " + rangeText(f.from - 12, f.to - 12) + nota : " · sem o período anterior completo na base") +
       (filtros !== "Nenhum filtro adicional" ? " · Filtros: " + filtros : "") +
       (tab === "cli" ? " · clique no cliente para ver o histórico" : "");
     if (!S.rankTables) S.rankTables = {};
@@ -595,7 +683,7 @@
           { key: "qtd", label: "Itens", num: true, sort: (id) => R.g.qtd[id], cell: (id) => fmt.int(R.g.qtd[id]) },
         ] });
       }
-      R.g = g; R.gp = mkPrev ? e.byRca(mkPrev) : null; R.pos = pos; R.t.setRows(g.ids, true);
+      R.g = g; R.gp = rcaDias ? rcaPrevDaily(rcaDias) : mkPrev ? e.byRca(mkPrev) : null; R.pos = pos; R.t.setRows(g.ids, true);
     } else {
       const g = e.byClient(S.mk);
       const order = g.ids.slice().sort((a, b) => g.liq[b] - g.liq[a]);

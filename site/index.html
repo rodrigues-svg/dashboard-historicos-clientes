@@ -91,7 +91,10 @@
     <section id="home-card" class="card" aria-labelledby="home-title">
       <div class="card-head">
         <div><h2 id="home-title">Painel do mês</h2><p id="home-sub"></p></div>
-        <div class="head-tools"><button id="home-items-btn" class="btn btn-ghost btn-sm" type="button" aria-expanded="false" aria-controls="home-items">Ver itens</button></div>
+        <div class="head-tools">
+          <label class="home-lab" id="home-lab-wrap" hidden><span>Laboratório</span><select id="home-lab"></select></label>
+          <button id="home-items-btn" class="btn btn-ghost btn-sm" type="button" aria-expanded="false" aria-controls="home-items">Ver itens</button>
+        </div>
       </div>
       <div class="home-body">
         <div id="home-grid" class="home-grid"></div>

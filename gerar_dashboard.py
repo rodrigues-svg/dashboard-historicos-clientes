@@ -273,10 +273,10 @@ def email_autenticado(msg, remetente):
     return bool(sp) and sp.group(1).strip("<>").split("@")[-1].lower() == dominio
 
 
-def baixar_do_gmail(cfg, token_path, verificar_remetente=True):
-    g = cfg.get("gmail") or {}
+def baixar_do_gmail(cfg, token_path, verificar_remetente=True, bloco="gmail"):
+    g = cfg.get(bloco) or {}
     if not g.get("remetente") or not g.get("assunto"):
-        sys.exit('ERRO: configure "gmail": {"remetente", "assunto"} em config.local.json '
+        sys.exit(f'ERRO: configure "{bloco}": {{"remetente", "assunto"}} em config.local.json '
                  "(na automação, vem do secret CONFIG_LOCAL_JSON).")
     g.setdefault("dias", 4)
     td = json.loads(Path(token_path).read_text(encoding="utf-8"))
@@ -330,6 +330,79 @@ def ler_planilha(caminho):
         sys.exit("ERRO: a planilha não tem as colunas esperadas: " + ", ".join(faltam))
     print(f"  {len(df):,} linhas | aba '{aba}'".replace(",", "."))
     return df
+
+
+def mapa_supervisores(df):
+    """nome (sem acento, maiúsculo) -> código, a partir de 'Descrição Supervisor' do analítico ("993 - LUCAS ...")."""
+    m = {}
+    for s in df["Descrição Supervisor"].astype(str).unique():
+        r = re.match(r"^\s*(\d+)\s*-\s*(.+?)\s*$", s)
+        if r:
+            m[sem_acento(r.group(2)).upper()] = int(r.group(1))
+    return m
+
+
+def ler_diario(caminho, sup_por_nome):
+    """Planilha diária (Data x Supervisor x RCA x Fornecedor): total de faturamento líquido e venda por dia, em centavos.
+    Fica só com os supervisores do analítico (a diária traz também outras equipes e lojas, fora do dashboard)."""
+    bruto = pd.read_excel(caminho, sheet_name=0)
+    col = {}
+    for c in bruto.columns:
+        k = sem_acento(c).upper().strip()
+        if k == "DATA":
+            col["data"] = c
+        elif k == "SUPERVISOR":
+            col["sup"] = c
+        elif k == "FORNECEDOR":
+            col["forn"] = c
+        elif "RCA" in k:
+            col["rca"] = c
+        elif "POSITIV" in k:
+            continue
+        elif "FATURAMENTO" in k and "VALOR" in k:
+            col["liq"] = c
+        elif "VENDA" in k and "VALOR" in k:
+            col["venda"] = c
+    faltam = [x for x in ("data", "sup", "rca", "forn", "liq", "venda") if x not in col]
+    if faltam:
+        sys.exit("ERRO: a planilha diária não tem as colunas esperadas: " + ", ".join(faltam))
+    df = pd.DataFrame({k: bruto[v] for k, v in col.items()})
+    if df["data"].dtype == object or str(df["data"].dtype).startswith("str"):
+        df["dt"] = pd.to_datetime(df["data"], format="%d/%m/%Y", errors="coerce")
+    else:
+        df["dt"] = pd.to_datetime(df["data"], errors="coerce")
+    df = df[df["dt"].notna()].copy()                                # descarta a linha "Total"
+    df["sup_cod"] = df["sup"].astype(str).map(lambda s: sup_por_nome.get(sem_acento(s).upper().strip()))
+    df["rca_cod"] = df["rca"].astype(str).str.extract(r"^\s*(\d+)")[0]
+    df = df[df["sup_cod"].notna() & df["rca_cod"].notna()].copy()
+    if df.empty:
+        sys.exit("ERRO: a planilha diária não tem linhas dos supervisores do dashboard.")
+    df["sup_cod"] = df["sup_cod"].astype("int64")
+    df["rca_cod"] = df["rca_cod"].astype("int64")
+    df["ymd"] = df["dt"].dt.year * 10000 + df["dt"].dt.month * 100 + df["dt"].dt.day
+    df["forn"] = df["forn"].map(normalizar_fornecedor)                # mesmos nomes do analítico (MSD PET*** -> MSD PET)
+    for c in ("liq", "venda"):
+        df[c] = (pd.to_numeric(df[c], errors="coerce").fillna(0.0) * 100).round().astype("int64")
+    return df.groupby(["sup_cod", "rca_cod", "forn", "ymd"], as_index=False)[["liq", "venda"]].sum()
+
+
+def obter_diario(cfg, token_path, sup_por_nome, verificar_remetente=True):
+    """Opcional: sem 'gmail_diario' no config, ou se o e-mail não vier, o painel usa a estimativa proporcional."""
+    if not cfg.get("gmail_diario"):
+        return None, ""
+    caminho = None
+    try:
+        caminho, origem = baixar_do_gmail(cfg, token_path, verificar_remetente, bloco="gmail_diario")
+        dia = ler_diario(caminho, sup_por_nome)
+    except SystemExit as e:
+        print(f"::warning::Planilha diária indisponível ({e}); o painel usa a estimativa proporcional.")
+        return None, ""
+    finally:
+        if caminho is not None:
+            Path(caminho).unlink(missing_ok=True)
+    fim = int(dia.ymd.max())
+    print(f"  Planilha diária: {len(dia):,} linhas | até {fim % 100:02d}/{(fim // 100) % 100:02d}/{fim // 10000}".replace(",", "."))
+    return dia, origem
 
 
 def normalizar_fornecedor(bruto):
@@ -402,7 +475,7 @@ def recorte_do_usuario(d, u):
     return d[d.rca_cod == u.codigo]
 
 
-def montar_payload(d, u, meta, registro, usuarios):
+def montar_payload(d, u, meta, registro, usuarios, dia=None):
     sub = recorte_do_usuario(d, u)
     sup_cods = sorted(sub.sup_cod.unique().tolist())
     sup_idx = {c: i for i, c in enumerate(sup_cods)}
@@ -444,6 +517,16 @@ def montar_payload(d, u, meta, registro, usuarios):
                  "p": pr_idx[r.pr_cod]} for r in cli_df.itertuples()],
         "rows": linhas,
     }
+    if dia is not None:
+        # total por dia, RCA e laboratório (centavos) do escopo do usuário; ini/fim valem para todos, mesmo que o escopo
+        # não tenha vendas no dia. f = nomes dos laboratórios, rc = códigos de RCA; k[i]/r[i] = índice em f/rc da linha i
+        sd = recorte_do_usuario(dia, u).groupby(["ymd", "rca_cod", "forn"], as_index=False)[["liq", "venda"]].sum()
+        fnomes = sorted(sd.forn.unique().tolist())
+        rcods = sorted(sd.rca_cod.unique().tolist())
+        payload["dia"] = {"ini": int(dia.ymd.min()), "fim": int(dia.ymd.max()), "f": fnomes, "rc": [int(c) for c in rcods],
+                          "d": sd.ymd.astype(int).tolist(), "r": sd.rca_cod.map({c: i for i, c in enumerate(rcods)}).astype(int).tolist(),
+                          "k": sd.forn.map({n: i for i, n in enumerate(fnomes)}).astype(int).tolist(),
+                          "liq": sd.liq.astype(int).tolist(), "venda": sd.venda.astype(int).tolist()}
     if u.tipo == "Gerente":
         payload["admin"] = {"usuarios": [{
             "nome": x.nome, "tipo": x.tipo, "email": x.login, "pendente": x.pendente,
@@ -474,7 +557,7 @@ def cifrar(payload, token, u):
     return {"v": 1, "it": PBKDF2_ITER, "salt": b64(salt), "iv": b64(iv), "ct": b64(ct)}, len(bruto)
 
 
-def escrever_dados(d, usuarios, registro, meta, silencioso=False):
+def escrever_dados(d, usuarios, registro, meta, silencioso=False, dia=None):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     for antigo in DATA_DIR.glob("*.js"):
         antigo.unlink()                                  # tokens renovados/revogados somem do site
@@ -483,7 +566,7 @@ def escrever_dados(d, usuarios, registro, meta, silencioso=False):
         reg = registro["usuarios"][u.uid]
         if reg["status"] != "ativo":
             continue
-        payload = montar_payload(d, u, meta, registro, usuarios)
+        payload = montar_payload(d, u, meta, registro, usuarios, dia)
         blob, bruto = cifrar(payload, reg["token"], u)
         arq = DATA_DIR / f"{fid_do_token(reg['token'])}.js"
         arq.write_text("window.__nv_blob=" + json.dumps(blob, separators=(",", ":")) + ";", encoding="utf-8")
@@ -767,16 +850,21 @@ def main():
         meta_fonte = f"arquivo {caminho.name}"
 
     try:
-        d = preparar(ler_planilha(caminho))
+        bruto_df = ler_planilha(caminho)
+        d = preparar(bruto_df)
     finally:
         if args.gmail:
             caminho.unlink(missing_ok=True)               # apaga o anexo temporário baixado do Gmail
+    dia = None
+    if args.gmail:                                        # planilha diária: comparação por dias corridos reais
+        dia, _ = obter_diario(cfg, args.token_path, mapa_supervisores(bruto_df),
+                              verificar_remetente=not args.sem_verificar_remetente)
     meta = {"geradoEm": agora().isoformat(timespec="seconds"), "fonte": meta_fonte}
     print("Gerando dados criptografados por usuário ...")
     preparar_assets()
     if args.ci:
         versionar_assets()
-    escrever_dados(d, usuarios, registro, meta, silencioso=args.ci)
+    escrever_dados(d, usuarios, registro, meta, silencioso=args.ci, dia=dia)
     n = gerar_lista_apps_script(usuarios, registro)
     print(f"apps_script/usuarios_autorizados.json: {n} usuário(s) autorizado(s) a enviar e-mail.")
 
