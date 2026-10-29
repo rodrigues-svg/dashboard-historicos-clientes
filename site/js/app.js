@@ -295,23 +295,22 @@
 
   const rangeText = (from, to) => (from === to ? fmt.ym(from) : fmt.ym(from) + " a " + fmt.ym(to));
 
-  /* chip ▲/▼ com a variação percentual; invert = quanto menor, melhor (ex.: devolução) */
-  function deltaChip(cur, old, invert) {
+  /* chip ▲/▼ com a variação percentual */
+  function deltaChip(cur, old) {
     if (!old) return h("span", { class: "delta flat" }, "sem base anterior");
     const d = ((cur - old) / Math.abs(old)) * 100;
     const up = d > 0.05, down = d < -0.05;
-    const good = invert ? down : up, bad = invert ? up : down;
-    return h("span", { class: "delta " + (good ? "up" : bad ? "down" : "flat") }, up || down ? icon(up ? "i-up" : "i-down") : null, fmt.pctSigned(d));
+    return h("span", { class: "delta " + (up ? "up" : down ? "down" : "flat") }, up || down ? icon(up ? "i-up" : "i-down") : null, fmt.pctSigned(d));
   }
 
   function renderKpis() {
     const s = S.sum, pv = S.sumPrev, f = S.f;
-    const tile = (cls, label, value, key, invert) => {
+    const tile = (cls, label, value, key) => {
       const kids = [h("div", { class: "k-label" }, h("i", {}), label), h("div", { class: "k-value" }, value)];
       if (pv) {
         const cur = s[key], old = pv[key];
-        const chip = deltaChip(cur, old, invert);
-        kids.push(h("div", { class: "k-delta" }, chip, h("span", {}, "vs " + rangeText(f.from - 12, f.to - 12) + ": " + (key === "qtd" || key === "clientes" ? fmt.int(old) : fmt.plain(fmt.brl(old))))));
+        const chip = deltaChip(cur, old);
+        kids.push(h("div", { class: "k-delta" }, chip, h("span", {}, "vs " + rangeText(f.from - 12, f.to - 12) + ": " + (key === "clientes" ? fmt.int(old) : fmt.plain(fmt.brl(old))))));
       }
       return h("div", { class: "kpi " + cls }, kids);
     };
@@ -319,10 +318,8 @@
     $("#kpis").replaceChildren(
       tile("hero", "Valor líquido (faturado)", money(s.liq), "liq"),
       tile("", "Venda (imputado)", money(s.venda), "venda"),
-      tile("k-dev", "Devolução", money(s.dev), "dev", true),
-      tile("k-sec", "Qtd. de itens", fmt.int(s.qtd), "qtd"),
       tile("k-sec", "Clientes positivados", fmt.int(s.clientes), "clientes"));
-    $("#kpi-note").textContent = "Valor líquido = faturado, já descontadas as devoluções; pode diferir de Venda − Devolução quando pedidos são imputados e faturados em meses diferentes. Clientes positivados = clientes com valor líquido positivo no filtro.";
+    $("#kpi-note").textContent = "Valor líquido = faturado, já descontadas as devoluções; pode diferir da Venda quando pedidos são imputados e faturados em meses diferentes. Clientes positivados = clientes com valor líquido positivo no filtro.";
   }
 
   /* ================================================================ painel de entrada (não depende dos filtros) */
@@ -542,10 +539,17 @@
   }
 
   function renderRank() {
-    const e = S.eng, p = S.p, tab = S.rankTab;
+    const e = S.eng, p = S.p, tab = S.rankTab, f = S.f;
+    /* mesmo período do ano anterior (só quando ele está inteiro na base) */
+    const hasPrev = f.from - 12 >= e.ymMin;
+    const mkPrev = hasPrev ? e.mask(f, -12) : null;
+    const filtros = filtersText();
     $$("#rank-tabs button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.r === tab)));
     $("#rank-title").textContent = tab === "rca" ? "Ranking de RCAs" : "Ranking de clientes";
-    $("#rank-sub").textContent = "Ordenado por valor líquido no período" + (tab === "cli" ? " · clique no cliente para ver o histórico" : "");
+    $("#rank-sub").textContent = "Ordenado por valor líquido · " + rangeText(f.from, f.to) +
+      (hasPrev ? " · comparado com " + rangeText(f.from - 12, f.to - 12) : " · sem o período anterior completo na base") +
+      (filtros !== "Nenhum filtro adicional" ? " · Filtros: " + filtros : "") +
+      (tab === "cli" ? " · clique no cliente para ver o histórico" : "");
     if (!S.rankTables) S.rankTables = {};
     const root = $("#rank-table");
     if (!S.rankTables.rca) {
@@ -557,6 +561,13 @@
     const pctCell = (v) => total > 0 ? h("div", { class: "pct-cell" }, h("span", {}, fmt.pct((v / total) * 100)), h("span", { class: "pct-bar", "aria-hidden": "true" }, h("i", { style: `width:${Math.max(0, Math.min(100, (v / total) * 100))}%` }))) : "—";
     const posCell = (n) => n <= 3 ? h("span", { class: "pos p" + n }, icon("i-medal"), n) : h("span", { class: "pos" }, n);
     const money = (v) => h("span", { class: v < 0 ? "neg" : "" }, fmt.plain(fmt.brl(v)));
+    /* colunas de comparação: R.g = período atual, R.gp = mesmo período do ano anterior (null se indisponível) */
+    const prevCols = (R) => [
+      { key: "prev", label: "Mesmo período ano ant.", num: true, sort: (id) => (R.gp ? R.gp.liq[id] : 0), cell: (id) => (R.gp ? money(R.gp.liq[id]) : "—") },
+      { key: "var", label: "Variação", num: true,
+        sort: (id) => (R.gp && R.gp.liq[id] > 0.005 ? (R.g.liq[id] - R.gp.liq[id]) / R.gp.liq[id] : -1e9),
+        cell: (id) => (!R.gp ? "—" : R.gp.liq[id] > 0.005 ? deltaChip(R.g.liq[id], R.gp.liq[id]) : h("span", { class: "muted" }, "sem base")) },
+    ];
 
     if (tab === "rca") {
       const g = e.byRca(S.mk);
@@ -570,12 +581,13 @@
           { key: "rca", label: "RCA", sort: (id) => rk[id], cell: (id) => p.rca[id].n, cls: "wrap" },
           { key: "sup", label: "Supervisor", sort: (id) => (p.sup[p.rca[id].s] ? p.sup[p.rca[id].s].n : ""), cell: (id) => (p.sup[p.rca[id].s] ? p.sup[p.rca[id].s].n : "") },
           { key: "liq", label: "Valor líquido", num: true, sort: (id) => R.g.liq[id], cell: (id) => money(R.g.liq[id]) },
+          ...prevCols(R),
           { key: "pct", label: "% do total", num: true, sort: (id) => R.g.liq[id], cell: (id) => pctCell(R.g.liq[id]) },
           { key: "cli", label: "Clientes", num: true, sort: (id) => R.g.clientes[id], cell: (id) => fmt.int(R.g.clientes[id]) },
           { key: "qtd", label: "Itens", num: true, sort: (id) => R.g.qtd[id], cell: (id) => fmt.int(R.g.qtd[id]) },
         ] });
       }
-      R.g = g; R.pos = pos; R.t.setRows(g.ids, true);
+      R.g = g; R.gp = mkPrev ? e.byRca(mkPrev) : null; R.pos = pos; R.t.setRows(g.ids, true);
     } else {
       const g = e.byClient(S.mk);
       const order = g.ids.slice().sort((a, b) => g.liq[b] - g.liq[a]);
@@ -590,12 +602,13 @@
           } }, p.cli[id].n) },
           { key: "city", label: "Cidade", sort: (id) => p.cli[id].y, cell: (id) => p.cli[id].y },
           { key: "liq", label: "Valor líquido", num: true, sort: (id) => R.g.liq[id], cell: (id) => money(R.g.liq[id]) },
+          ...prevCols(R),
           { key: "pct", label: "% do total", num: true, sort: (id) => R.g.liq[id], cell: (id) => pctCell(R.g.liq[id]) },
           { key: "qtd", label: "Itens", num: true, sort: (id) => R.g.qtd[id], cell: (id) => fmt.int(R.g.qtd[id]) },
           { key: "last", label: "Última compra", num: true, sort: (id) => R.g.last[id], cell: (id) => (R.g.last[id] >= 0 ? fmt.ymNum(R.g.last[id]) : "—") },
         ] });
       }
-      R.g = g; R.pos = pos; R.t.setRows(g.ids, true);
+      R.g = g; R.gp = mkPrev ? e.byClient(mkPrev) : null; R.pos = pos; R.t.setRows(g.ids, true);
     }
   }
 

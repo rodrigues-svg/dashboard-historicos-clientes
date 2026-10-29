@@ -496,6 +496,17 @@ def escrever_dados(d, usuarios, registro, meta, silencioso=False):
 # --------------------------------------------------------------------------
 # Assets (logo recortada, favicon, logo embutida para o PDF)
 # --------------------------------------------------------------------------
+def versionar_assets():
+    """Carimba css/js do index.html com a versão do build (?v=...). O Pages guarda cada arquivo por 10 min; sem isso,
+    logo após uma atualização o navegador pode juntar um .js antigo (em cache) com outro novo e o site não abre."""
+    idx = SITE / "index.html"
+    versao = (os.environ.get("GITHUB_SHA") or "")[:10] or agora().strftime("%Y%m%d%H%M")
+    html = idx.read_text(encoding="utf-8")
+    novo, n = re.subn(r'((?:href|src)=")(?!https?:|//)([^"?#]+\.(?:css|js))(?:\?v=[^"]*)?"', rf'\1\2?v={versao}"', html)
+    idx.write_text(novo, encoding="utf-8")
+    print(f"  index.html: {n} arquivo(s) css/js carimbado(s) com a versão {versao}")
+
+
 def preparar_assets():
     from PIL import Image
     if not LOGO_ORIGINAL.exists():
@@ -763,6 +774,8 @@ def main():
     meta = {"geradoEm": agora().isoformat(timespec="seconds"), "fonte": meta_fonte}
     print("Gerando dados criptografados por usuário ...")
     preparar_assets()
+    if args.ci:
+        versionar_assets()
     escrever_dados(d, usuarios, registro, meta, silencioso=args.ci)
     n = gerar_lista_apps_script(usuarios, registro)
     print(f"apps_script/usuarios_autorizados.json: {n} usuário(s) autorizado(s) a enviar e-mail.")
