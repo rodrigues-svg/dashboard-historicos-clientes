@@ -318,7 +318,7 @@
     commit();
     const ctx = { p, eng: S.eng, token: TOKEN };
     const comTend = NV.trend.init(ctx), comEstoque = NV.stock.init(ctx), comAval = NV.aval.init(ctx), comVal = NV.val.init(ctx);
-    NV.painel.init(ctx);
+    NV.painel.init(ctx); NV.extras.init(ctx);
     $("#app-nav").hidden = false;
     /* tela inicial: um botão para cada função disponível (sem funções extras, abre direto em Clientes) */
     $("#hub-title").textContent = "Olá, " + u.nome.split(" ")[0] + "!";
@@ -341,6 +341,7 @@
     if (v === "aval") NV.aval.mostrar();
     if (v === "val") NV.val.mostrar();
     if (v === "mes" || v === "oport" || v === "prod") NV.painel.mostrar(v);
+    if (v === "visao" || v === "conq") NV.extras.mostrar(v);
   }
 
   function renderFooter() {

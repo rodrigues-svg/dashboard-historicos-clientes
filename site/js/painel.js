@@ -7,6 +7,36 @@
   const familia = (nome) => (/^BRAVECTO/i.test(nome) ? "BRAVECTO" : String(nome).trim().split(/\s+/)[0].toUpperCase());
   let C = null;                                                     // contexto da sessão {p, eng, token}
 
+  /* ---------------------------------------------------------------- filtros comuns: supervisor (gerente), RCA (gerente e
+     supervisor) e laboratório (todos). Valem para Meu mês, Oportunidades, Produtos e Conquistas. */
+  const F = { sup: -1, rca: -1, lab: -1 };
+  function rcasFiltro() {
+    const { p } = C;
+    return p.rca.map((r, i) => ({ i, c: r.c, s: r.s, n: r.n.replace(/ \(carteira própria\)$/, "") })).filter((r) => F.sup < 0 || r.s === F.sup);
+  }
+  /* RCAs marcados (null = todos) */
+  function mascaraRca() {
+    const e = C.eng;
+    if (F.rca < 0 && F.sup < 0) return null;
+    const m = new Uint8Array(e.nRca);
+    if (F.rca >= 0) m[F.rca] = 1; else rcasFiltro().forEach((r) => (m[r.i] = 1));
+    return m;
+  }
+  function barraFiltros(aoMudar, opc) {
+    const { p } = C, u = p.user, o = opc || {};
+    const campo = (rot, sel) => h("label", { class: "home-lab" }, h("span", {}, rot), sel);
+    const out = [];
+    if (u.tipo === "Gerente" && p.sup.length > 1) out.push(campo("Supervisor", h("select", { onchange: (ev) => { F.sup = +ev.target.value; F.rca = -1; aoMudar(); } },
+      h("option", { value: -1 }, "Todos os supervisores"), p.sup.map((x, i) => h("option", { value: i, selected: i === F.sup }, x.n)))));
+    const rcas = rcasFiltro();
+    if (u.tipo !== "RCA" && rcas.length > 1) out.push(campo("RCA", h("select", { onchange: (ev) => { F.rca = +ev.target.value; aoMudar(); } },
+      h("option", { value: -1 }, "Todos os RCAs"), rcas.map((r) => h("option", { value: r.i, selected: r.i === F.rca }, r.n)))));
+    if (!o.semLab && p.forn.length > 1) out.push(campo("Laboratório", h("select", { onchange: (ev) => { F.lab = +ev.target.value; aoMudar(); } },
+      h("option", { value: -1 }, "Todos os laboratórios"), p.forn.map((n, i) => h("option", { value: i, selected: i === F.lab }, n)))));
+    return h("div", { class: "head-tools" }, out);
+  }
+  NV.filtrosPainel = { F, mascaraRca, barraFiltros, rcasFiltro };
+
   /* ---------------------------------------------------------------- dias úteis (seg-sex sem feriados nacionais) */
   function pascoa(y) {
     const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
@@ -31,19 +61,21 @@
   }
 
   /* ================================================================ Meu mês */
-  const M = { sel: "" };
   function renderMes() {
     const { p, eng: e } = C, box = $("#mes-card"), metas = p.metas || { rca: {} }, u = p.user;
     const ym = metas.ym != null ? metas.ym : e.ymMax, ano = Math.floor(ym / 12), mo = ym % 12;
     const ate = p.dia && Math.floor(p.dia.fim / 100) === ano * 100 + mo + 1 ? p.dia.fim % 100 : Math.max(1, new Date().getDate() - 1);
     const du = diasUteis(ano, mo, ate);
-    const rcas = p.rca.map((r, i) => ({ i, c: r.c, n: r.n.replace(/ \(carteira própria\)$/, ""), m: metas.rca[String(r.c)] })).filter((r) => r.m);
-    const alvo = M.sel === "" ? rcas : rcas.filter((r) => String(r.c) === M.sel);
+    const lab = F.lab >= 0 ? p.forn[F.lab] : "";
+    const metaDe = (m) => (lab ? (m.f || {})[lab] || 0 : m.v);
+    const rcas = rcasFiltro().map((r) => ({ ...r, m: metas.rca[String(r.c)] })).filter((r) => r.m);
+    const alvo = F.rca >= 0 ? rcas.filter((r) => r.i === F.rca) : rcas;
     const ok = new Uint8Array(e.nRca); alvo.forEach((r) => (ok[r.i] = 1));
     // vendido no mês (venda imputada), positivação (clientes com venda) e por fornecedor
     let venda = 0; const porRca = new Float64Array(e.nRca), porForn = new Map(), cli = new Map(), cliRca = new Map();
     for (let i = 0; i < e.n; i++) {
       if (e.ym[i] !== ym) continue;
+      if (F.lab >= 0 && e.prodForn[e.prod[i]] !== F.lab) continue;
       const r = e.rca[i], v = e.venda[i];
       porRca[r] += v;
       const kc = r * e.nCli + e.cli[i]; cliRca.set(kc, (cliRca.get(kc) || 0) + v);
@@ -53,23 +85,22 @@
       cli.set(e.cli[i], (cli.get(e.cli[i]) || 0) + v);
     }
     const pos = [...cli.values()].filter((v) => v > 0.005).length;
-    const meta = alvo.reduce((s, r) => s + r.m.v, 0), metaPos = alvo.reduce((s, r) => s + r.m.p, 0);
+    const meta = alvo.reduce((s, r) => s + metaDe(r.m), 0), metaPos = lab ? 0 : alvo.reduce((s, r) => s + r.m.p, 0);
     const pct = meta > 0 ? (venda / meta) * 100 : 0, ritmo = du.total ? (du.passados / du.total) * 100 : 0;
     const falta = Math.max(0, meta - venda), restam = Math.max(0, du.total - du.passados);
     const metaForn = new Map();
-    alvo.forEach((r) => Object.entries(r.m.f || {}).forEach(([f, v]) => metaForn.set(f, (metaForn.get(f) || 0) + v)));
+    alvo.forEach((r) => Object.entries(r.m.f || {}).forEach(([f, v]) => { if (!lab || f === lab) metaForn.set(f, (metaForn.get(f) || 0) + v); }));
     const barra = (pc) => h("div", { class: "mes-bar" }, h("i", { style: `width:${Math.min(100, pc)}%` }), h("b", { style: `left:${Math.min(100, ritmo)}%` }));
-    const sel = rcas.length > 1 ? h("select", { "aria-label": "Vendedor", onchange: (ev) => { M.sel = ev.target.value; renderMes(); } },
-      h("option", { value: "" }, u.tipo === "Gerente" ? "Todas as equipes" : "Toda a equipe"), rcas.map((r) => h("option", { value: r.c, selected: String(r.c) === M.sel }, r.n))) : null;
+    const sel = barraFiltros(renderMes);
     const status = pct >= ritmo ? "No ritmo" : pct >= ritmo * 0.85 ? "Perto do ritmo" : "Abaixo do ritmo";
-    const ranking = rcas.length > 1 ? rcas.map((r) => {
+    const ranking = rcas.length > 1 && F.rca < 0 ? rcas.map((r) => {
       let pr = 0; cliRca.forEach((v, k) => { if (Math.floor(k / e.nCli) === r.i && v > 0.005) pr++; });
-      return { r, v: porRca[r.i], pc: r.m.v ? (porRca[r.i] / r.m.v) * 100 : 0, pos: pr };
+      return { r, v: porRca[r.i], meta: metaDe(r.m), pc: metaDe(r.m) ? (porRca[r.i] / metaDe(r.m)) * 100 : 0, pos: pr };
     }).sort((a, b) => b.pc - a.pc) : [];
 
-    if (!rcas.length) { box.replaceChildren(h("div", { class: "card-head" }, h("div", {}, h("h2", {}, "Meu mês"), h("p", {}, "As metas do mês ainda não chegaram.")))); return; }
+    if (!rcas.length) { box.replaceChildren(h("div", { class: "card-head" }, h("div", {}, h("h2", {}, "Meu mês"), h("p", {}, "As metas do mês ainda não chegaram para esse filtro."))), barraFiltros(renderMes)); return; }
     box.replaceChildren(
-      h("div", { class: "card-head" }, h("div", {}, h("h2", {}, `${NV.MESES[mo]} de ${ano}`),
+      h("div", { class: "card-head" }, h("div", {}, h("h2", {}, `${NV.MESES[mo]} de ${ano}` + (lab ? " · " + lab : "")),
         h("p", {}, `Dados até ${String(ate).padStart(2, "0")}/${String(mo + 1).padStart(2, "0")} · ${du.passados} de ${du.total} dias úteis · faltam ${restam}`)), h("div", { class: "head-tools" }, sel)),
       h("div", { class: "card-body" },
         h("div", { class: "mes-grid" },
@@ -79,8 +110,8 @@
             barra(pct), h("div", { class: "k-delta" }, h("span", { class: "pill " + (pct >= ritmo ? "ok" : "warn") }, status), ` ritmo esperado ${fmt.pct(ritmo)}`)),
           h("div", { class: "kpi" }, h("div", { class: "k-label" }, h("i", {}), "Preciso vender por dia útil"), h("div", { class: "k-value" }, restam ? money(falta / restam) : "—"),
             h("div", { class: "k-delta" }, `faltam ${money(falta)} em ${restam} dias úteis`)),
-          h("div", { class: "kpi k-sec" }, h("div", { class: "k-label" }, h("i", {}), "Clientes positivados"), h("div", { class: "k-value" }, `${fmt.int(pos)} de ${fmt.int(metaPos)}`),
-            barra(metaPos ? (pos / metaPos) * 100 : 0), h("div", { class: "k-delta" }, metaPos > pos ? `faltam ${fmt.int(metaPos - pos)}` : "meta de positivação batida"))),
+          h("div", { class: "kpi k-sec" }, h("div", { class: "k-label" }, h("i", {}), "Clientes positivados" + (lab ? " (" + lab + ")" : "")), h("div", { class: "k-value" }, metaPos ? `${fmt.int(pos)} de ${fmt.int(metaPos)}` : fmt.int(pos)),
+            metaPos ? barra((pos / metaPos) * 100) : null, h("div", { class: "k-delta" }, !metaPos ? "a meta de positivação é geral (sem laboratório)" : metaPos > pos ? `faltam ${fmt.int(metaPos - pos)}` : "meta de positivação batida"))),
         h("h3", { class: "aval-h3" }, "Por laboratório"),
         h("div", { class: "table-wrap" }, h("table", { class: "tbl" }, h("thead", {}, h("tr", {}, ["Laboratório", "Meta", "Vendido", "Atingido"].map((t, i) => h("th", { class: i ? "num" : "", style: "cursor:default" }, t)))),
           h("tbody", {}, [...metaForn.entries()].sort((a, b) => b[1] - a[1]).map(([f, mv]) => {
@@ -89,9 +120,9 @@
           })))),
         ranking.length ? [h("h3", { class: "aval-h3" }, "Ranking da equipe (% da meta)"),
           h("div", { class: "table-wrap" }, h("table", { class: "tbl" }, h("thead", {}, h("tr", {}, ["#", "Vendedor", "Vendido", "Meta", "Atingido", "Positivação"].map((t, i) => h("th", { class: i > 1 ? "num" : "", style: "cursor:default" }, t)))),
-            h("tbody", {}, ranking.map((x, k) => h("tr", {}, h("td", {}, k + 1), h("td", { class: "wrap" }, x.r.n), h("td", { class: "num" }, money(x.v)), h("td", { class: "num" }, money(x.r.m.v)),
+            h("tbody", {}, ranking.map((x, k) => h("tr", {}, h("td", {}, k + 1), h("td", { class: "wrap" }, x.r.n), h("td", { class: "num" }, money(x.v)), h("td", { class: "num" }, money(x.meta)),
               h("td", { class: "num" }, h("div", { class: "tbar " + (x.pc >= ritmo ? "ok" : "neu") }, h("span", {}, fmt.pct(x.pc)), h("i", { style: `width:${Math.min(100, x.pc)}%` }))),
-              h("td", { class: "num" }, `${fmt.int(x.pos)} / ${fmt.int(x.r.m.p)}`))))))] : null,
+              h("td", { class: "num" }, lab ? fmt.int(x.pos) : `${fmt.int(x.pos)} / ${fmt.int(x.r.m.p)}`))))))] : null,
         h("p", { class: "note" }, "Vendido = venda imputada no mês (base de vendas). Ritmo esperado = dias úteis passados ÷ dias úteis do mês. Metas: relatórios diários de metas por RCA, por laboratório e de positivação.")));
   }
 
@@ -102,9 +133,10 @@
     const fim = e.ymMax - 1, ano = Math.floor(fim / 12), ini = Math.max(ano * 12, e.ymMin);
     if (fim < ini || ini - 12 < e.ymMin) { box.replaceChildren(h("div", { class: "card-head" }, h("div", {}, h("h2", {}, "Oportunidades"), h("p", {}, "Ainda não há meses fechados suficientes para comparar.")))); return; }
     const famProd = p.prod.map((x) => familia(x.n));
-    const fam = new Map(), cliFam = new Map();
+    const fam = new Map(), cliFam = new Map(), ok = mascaraRca();
     for (let i = 0; i < e.n; i++) {
       const y = e.ym[i];
+      if ((ok && !ok[e.rca[i]]) || (F.lab >= 0 && e.prodForn[e.prod[i]] !== F.lab)) continue;
       const atual = y >= ini && y <= fim, ant = y >= ini - 12 && y <= fim - 12;
       if (!atual && !ant) continue;
       const f = famProd[e.prod[i]], l = e.liq[i];
@@ -119,7 +151,7 @@
       h("b", {}, x.f), h("span", { class: x.cur >= x.ant ? "up" : "down" }, (x.cur >= x.ant ? "+" : "−") + money(Math.abs(x.cur - x.ant))), h("small", {}, dpc(x.cur, x.ant)));
     box.replaceChildren(
       h("div", { class: "card-head" }, h("div", {}, h("h2", {}, "Oportunidades"),
-        h("p", {}, `${fmt.ym(ini)} a ${fmt.ym(fim)} comparado com ${fmt.ym(ini - 12)} a ${fmt.ym(fim - 12)} · só meses fechados · quedas a partir de R$ 1.000`))),
+        h("p", {}, `${fmt.ym(ini)} a ${fmt.ym(fim)} comparado com ${fmt.ym(ini - 12)} a ${fmt.ym(fim - 12)} · só meses fechados · quedas a partir de R$ 1.000`)), barraFiltros(() => { O.fam = ""; renderOport(); })),
       h("div", { class: "card-body" },
         h("p", {}, h("b", {}, "Geral: "), `${money(tot.cur)} contra ${money(tot.ant)} (${dpc(tot.cur, tot.ant)})`),
         h("h3", { class: "aval-h3" }, "Famílias (toque para ver os clientes)"),
@@ -142,9 +174,9 @@
     let corpo = h("p", { class: "note" }, "Digite ao menos 2 letras para buscar.");
     if (q.length >= 2) {
       const prods = new Set(); p.prod.forEach((x, i) => { if (NV.norm(x.n).includes(q)) prods.add(i); });
-      const m = new Map();
+      const m = new Map(), ok = mascaraRca();
       for (let i = 0; i < e.n; i++) {
-        if (!prods.has(e.prod[i]) || e.qtd[i] <= 0) continue;
+        if (!prods.has(e.prod[i]) || e.qtd[i] <= 0 || (ok && !ok[e.rca[i]])) continue;
         const k = e.cli[i] + "|" + e.prod[i], o = m.get(k) || { c: e.cli[i], pr: e.prod[i], ult: -1, qtd: 0, liq: 0 };
         o.qtd += e.qtd[i]; o.liq += e.liq[i]; if (e.ym[i] > o.ult) o.ult = e.ym[i]; m.set(k, o);
       }
@@ -155,13 +187,13 @@
             h("td", { class: "num" }, fmt.ymNum(x.ult)), h("td", { class: "num" }, fmt.int(x.qtd)), h("td", { class: "num" }, money(x.liq)))))))]
         : h("p", { class: "note" }, "Nenhum cliente da sua carteira comprou esse produto.");
     }
-    box.replaceChildren(h("div", { class: "card-head" }, h("div", {}, h("h2", {}, "Produtos"), h("p", {}, "Busque um produto e veja quais clientes compraram, da compra mais recente para a mais antiga."))),
+    box.replaceChildren(h("div", { class: "card-head" }, h("div", {}, h("h2", {}, "Produtos"), h("p", {}, "Busque um produto e veja quais clientes compraram, da compra mais recente para a mais antiga.")), barraFiltros(renderProd, { semLab: true })),
       h("div", { class: "card-body" }, h("div", { class: "val-tools" }, inp), corpo));
   }
 
   NV.painel = {
     init(ctx) {
-      C = ctx; M.sel = ""; O.fam = ""; P.q = "";
+      C = ctx; F.sup = -1; F.rca = -1; F.lab = -1; O.fam = ""; P.q = "";
       const temMeta = !!(ctx.p.metas && Object.keys(ctx.p.metas.rca || {}).length);
       $("#app-nav [data-view=mes]").hidden = !temMeta;
       return true;

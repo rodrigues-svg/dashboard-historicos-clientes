@@ -119,6 +119,8 @@
     <button type="button" data-view="hist"><svg><use href="#i-users"/></svg><span>Clientes</span></button>
     <button type="button" data-view="oport"><svg><use href="#i-trend"/></svg><span>Oportunidades</span></button>
     <button type="button" data-view="prod"><svg><use href="#i-search"/></svg><span>Produtos</span></button>
+    <button type="button" data-view="visao"><svg><use href="#i-file"/></svg><span>Visão do cliente</span></button>
+    <button type="button" data-view="conq"><svg><use href="#i-star"/></svg><span>Conquistas</span></button>
     <button type="button" data-view="trend"><svg><use href="#i-trend"/></svg><span>Tendências</span><i class="dot" id="trend-dot" hidden></i></button>
     <button type="button" data-view="stock"><svg><use href="#i-box"/></svg><span>Estoque</span></button>
     <button type="button" data-view="val" hidden><svg><use href="#i-clock"/></svg><span>Validades</span></button>
@@ -141,6 +143,10 @@
           <b>Oportunidades</b><small>Famílias que caíram ou cresceram no ano e os clientes com as maiores quedas.</small></button>
         <button type="button" class="hub-tile" data-go-view="prod"><span class="hub-ic"><svg><use href="#i-search"/></svg></span>
           <b>Produtos</b><small>Busque um produto e veja quem comprou e quando.</small></button>
+        <button type="button" class="hub-tile" data-go-view="visao"><span class="hub-ic"><svg><use href="#i-file"/></svg></span>
+          <b>Visão do cliente</b><small>Modo apresentação: o que o cliente comprou em 12 meses e o que mais pode trabalhar.</small></button>
+        <button type="button" class="hub-tile" data-go-view="conq"><span class="hub-ic"><svg><use href="#i-star"/></svg></span>
+          <b>Conquistas</b><small>Você contra a sua melhor marca: recordes do ano e desafio do mês.</small></button>
         <button type="button" class="hub-tile" data-go-view="trend"><span class="hub-ic"><svg><use href="#i-trend"/></svg></span>
           <b>Tendências</b><small>Preencher a 1ª e a 2ª tendência e acompanhar contra o realizado.</small><i class="dot" id="hub-trend-dot" hidden></i></button>
         <button type="button" class="hub-tile" data-go-view="stock"><span class="hub-ic"><svg><use href="#i-box"/></svg></span>
@@ -178,6 +184,9 @@
   <main class="content" id="view-mes" data-view="mes" hidden><section id="mes-card" class="card"></section></main>
   <main class="content" id="view-oport" data-view="oport" hidden><section id="oport-card" class="card"></section></main>
   <main class="content" id="view-prod" data-view="prod" hidden><section id="prod-card" class="card"></section></main>
+
+  <main class="content" id="view-visao" data-view="visao" hidden><section id="visao-card" class="card"></section></main>
+  <main class="content" id="view-conq" data-view="conq" hidden><section id="conq-card" class="card"></section></main>
 
   <main class="content" id="view-val" data-view="val" hidden>
     <section id="val-card" class="card"></section>
@@ -433,6 +442,7 @@
 <script src="js/avaliacao.js" defer></script>
 <script src="js/validades.js" defer></script>
 <script src="js/painel.js" defer></script>
+<script src="js/conquistas.js" defer></script>
 <script src="js/app.js" defer></script>
 </body>
 </html>
