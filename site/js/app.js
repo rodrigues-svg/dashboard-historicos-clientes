@@ -123,6 +123,7 @@
     NV.charts.destroy();
     closeAll();
     S.p = S.eng = S.user = S.mk = S.mkPrev = null; S.hist = [];
+    $("#alert-bar").hidden = true;
     $("#app-view").hidden = true;
     $("#login-view").hidden = false;
     $("#login-pin").value = "";
@@ -315,7 +316,18 @@
     $$("#view-seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === "chart")));
     renderFooter(); renderHist(); setupHomeLab(); renderHome();
     commit();
+    showView("hist");
+    NV.trend.init({ p, eng: S.eng, token: TOKEN });
     NV.remote.logLogin(TOKEN);
+  }
+
+  /* funções do aplicativo (menu de cima): Clientes e Tendências */
+  function showView(v) {
+    document.body.dataset.view = v;
+    $$("#app-view > main[data-view]").forEach((m) => { m.hidden = m.dataset.view !== v; });
+    $$("#app-nav button").forEach((b) => (b.dataset.view === v ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current")));
+    scrollTo(0, 0);
+    if (v === "trend") NV.trend.mostrar();
   }
 
   function renderFooter() {
@@ -638,6 +650,11 @@
     $$("#view-seg button").forEach((b) => b.addEventListener("click", () => {
       S.chartView = b.dataset.v; $$("#view-seg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); renderChart();
     }));
+    $$("#app-nav button").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
+    $("#alert-go").addEventListener("click", () => { showView("trend"); setTimeout(() => NV.trend.irParaResponder(), 80); });
+    $("#trend-share").addEventListener("click", () => NV.trend.abrirImagem());
+    $("#trend-img-share").addEventListener("click", () => NV.trend.compartilhar());
+    $("#trend-img-save").addEventListener("click", () => NV.trend.salvarImagem());
     $("#home-lab").addEventListener("change", (ev) => { S.homeLab = +ev.target.value; renderHome(); });
     $("#home-sup").addEventListener("change", (ev) => {
       S.homeSup = +ev.target.value;

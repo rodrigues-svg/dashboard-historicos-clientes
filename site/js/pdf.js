@@ -125,6 +125,16 @@
       if (!this.endpoint) return;
       try { fetch(this.endpoint, { method: "POST", mode: "no-cors", keepalive: true, body: JSON.stringify({ action: "login", token, ua: navigator.userAgent.slice(0, 140) }) }); } catch (e) { /* log é opcional */ }
     },
+    /* chamada genérica ao Apps Script (POST com o token pessoal); erros viram exceção com a mensagem do servidor */
+    async call(action, token, dados) {
+      if (!this.endpoint) throw new Error("O servidor do aplicativo ainda não foi configurado.");
+      const res = await fetch(this.endpoint, { method: "POST", body: JSON.stringify(Object.assign({ action, token }, dados || {})), redirect: "follow" });
+      const j = await res.json();
+      if (!j.ok) throw new Error(j.erro || "Falha na comunicação com o servidor.");
+      return j;
+    },
+    tendenciasLer(token) { return this.call("tendencias_ler", token); },
+    tendenciaSalvar(token, dados) { return this.call("tendencia_salvar", token, dados); },
     async fetchLog(token) {
       const res = await fetch(this.endpoint + (this.endpoint.includes("?") ? "&" : "?") + "action=log&token=" + encodeURIComponent(token), { redirect: "follow" });
       const j = await res.json();

@@ -136,6 +136,26 @@ Só grava `site/config.js` (o gerador confere se a URL termina em `/exec`; conta
   planilha.
 - Mensagens automáticas com anexo podem cair em spam nos primeiros envios para um cliente novo.
 
+## Tendências no aplicativo (Radar Novavet)
+
+O Apps Script também guarda e entrega as **tendências** (1ª e 2ª de cada mês) para a aba "Tendências" do aplicativo.
+Sem mudar permissões do script (continua só na planilha do log):
+
+1. **Espelho do Forms:** na planilha do log, crie a aba `Tendencias_Forms` e, na célula A1, a fórmula
+   `=IMPORTRANGE("<URL da planilha de respostas do Forms>"; "Respostas ao formulário 1!A1:L2000")`.
+   Na primeira vez o Sheets pede **Permitir acesso** (uma vez). A aba `Tendencias` (respostas digitadas no aplicativo)
+   o próprio script cria no primeiro envio.
+2. **Código:** cole o novo `Code.gs` (substitui o anterior) e salve.
+3. **Propriedades do script:** atualize `USUARIOS` com o novo `apps_script/usuarios_autorizados.json` (agora com os
+   campos `c` e `s`) e crie `EQUIPE` com o conteúdo de `apps_script/equipe.json`. Ambos saem do
+   `python gerar_dashboard.py --so-apps-script`; refaça sempre que mudar a equipe.
+4. **Implantar → Gerenciar implantações → editar a implantação atual → Nova versão** (a URL `/exec` não muda).
+5. **Datas e link do Forms:** ficam em `config.local.json` (bloco `tendencias`: `datas`, `form_url`, `sup_rotulos`) e
+   no secret `CONFIG_LOCAL_JSON`; vão para o aplicativo dentro dos dados cifrados.
+
+Quem vê o quê: o gerente vê todos; o supervisor, a equipe dele; o RCA, só o dele. O supervisor e o gerente também
+podem preencher pela equipe (vaga/ausência).
+
 ## Problemas comuns
 
 - **Abre página de login do Google/HTML no lugar do JSON**: o acesso não é "Qualquer pessoa" (Workspace pode bloquear —

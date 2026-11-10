@@ -77,6 +77,7 @@ COLUNAS_OBRIGATORIAS = [
 # Não fica no código (o repositório é público): é montada a partir do usuarios.csv,
 # que no CI vem do secret USUARIOS_CSV.
 # --------------------------------------------------------------------------
+TENDENCIAS = {}        # bloco "tendencias" do config (datas da 1ª/2ª tendência, link do Forms, rótulos do Forms)
 SUPERVISORES = {}      # codigo -> nome
 RCAS = {}              # codigo -> (nome, codigo do supervisor)
 
@@ -527,6 +528,9 @@ def montar_payload(d, u, meta, registro, usuarios, dia=None):
                           "d": sd.ymd.astype(int).tolist(), "r": sd.rca_cod.map({c: i for i, c in enumerate(rcods)}).astype(int).tolist(),
                           "k": sd.forn.map({n: i for i, n in enumerate(fnomes)}).astype(int).tolist(),
                           "liq": sd.liq.astype(int).tolist(), "venda": sd.venda.astype(int).tolist()}
+    if TENDENCIAS.get("datas"):
+        # datas da 1ª/2ª tendência (da agenda) e link do Forms: dentro do payload cifrado, não no site público
+        payload["tendencias"] = {"datas": TENDENCIAS["datas"], "formUrl": TENDENCIAS.get("form_url", "")}
     if u.tipo == "Gerente":
         payload["admin"] = {"usuarios": [{
             "nome": x.nome, "tipo": x.tipo, "email": x.login, "pendente": x.pendente,
@@ -766,9 +770,16 @@ def gerar_lista_apps_script(usuarios, registro):
     for u in usuarios:
         reg = registro["usuarios"][u.uid]
         if reg["status"] == "ativo":
-            autorizados[hash_envio_email(reg["token"])] = {"n": u.nome, "e": u.email, "p": u.tipo}
+            # c = código do RCA (ou do supervisor); s = código do supervisor (o próprio, no caso do supervisor)
+            autorizados[hash_envio_email(reg["token"])] = {"n": u.nome, "e": u.email, "p": u.tipo, "c": u.codigo,
+                                                           "s": u.codigo if u.tipo == "Supervisor" else u.sup_codigo}
     # compacto (uma linha): é colado na propriedade USUARIOS do Apps Script, que aceita até 9 KB por valor (~60 pessoas)
     (APPS_SCRIPT_DIR / "usuarios_autorizados.json").write_text(json.dumps(autorizados, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    # equipe (propriedade EQUIPE): RCA -> nome no padrão do Forms e supervisor; supervisor -> rótulo do Forms (código do Forms pode diferir do ERP)
+    rotulos = TENDENCIAS.get("sup_rotulos") or {}
+    equipe = {"rca": {str(c): {"n": nome.upper().replace(" (CARTEIRA PRÓPRIA)", ""), "s": sup} for c, (nome, sup) in sorted(RCAS.items())},
+              "sup": {str(c): rotulos.get(str(c)) or f"{c} - {nome.upper()}" for c, nome in sorted(SUPERVISORES.items())}}
+    (APPS_SCRIPT_DIR / "equipe.json").write_text(json.dumps(equipe, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     return len(autorizados)
 
 
@@ -793,6 +804,7 @@ def main():
     cfg = json.loads(CONFIG_PATH.read_text(encoding="utf-8")) if CONFIG_PATH.exists() else {}
     if CONFIG_LOCAL.exists():                             # ajustes só desta máquina (fora do Git): excel_padrao, base_url...
         cfg.update(json.loads(CONFIG_LOCAL.read_text(encoding="utf-8")))
+    TENDENCIAS.update(cfg.get("tendencias") or {})
     ap = argparse.ArgumentParser(description="Gerador do Dashboard Consulta Históricos de Clientes")
     ap.add_argument("--excel", help="caminho da planilha analítica (padrão: config.json)")
     ap.add_argument("--gmail", action="store_true", help="baixa a planilha do e-mail (usa token.json)")

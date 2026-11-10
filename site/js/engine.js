@@ -180,6 +180,34 @@
       return out;
     }
 
+    /* realizado de um mês por RCA, nas medidas da Tendência: valor líquido geral, MSD PET, IDEXX BRASIL, tapetes Fun Pads (R$),
+       unidades de Bravecto (produtos que começam com BRAVECTO; a TAG fica fora) e positivação (clientes CNPJ com valor líquido > 0) */
+    rcaMetrics(ym) {
+      const nR = this.nRca;
+      if (!this._tm) {
+        const p = this.p;
+        this._tm = { msd: p.forn.indexOf("MSD PET"), idexx: p.forn.indexOf("IDEXX BRASIL"),
+          brav: Uint8Array.from(p.prod, (x) => (/^BRAVECTO/i.test(x.n) ? 1 : 0)), fun: Uint8Array.from(p.prod, (x) => (/FUN PADS/i.test(x.n) ? 1 : 0)) };
+      }
+      const t = this._tm;
+      const o = { geral: new Float64Array(nR), msd: new Float64Array(nR), idexx: new Float64Array(nR), fun: new Float64Array(nR),
+        brav: new Float64Array(nR), pos: new Float64Array(nR) };
+      const pair = new Map();
+      for (let i = 0; i < this.n; i++) {
+        if (this.ym[i] !== ym) continue;
+        const r = this.rca[i], pr = this.prod[i], fo = this.prodForn[pr], l = this.liq[i];
+        o.geral[r] += l;
+        if (fo === t.msd) o.msd[r] += l;
+        if (fo === t.idexx) o.idexx[r] += l;
+        if (t.fun[pr]) o.fun[r] += l;
+        if (t.brav[pr]) o.brav[r] += this.qtd[i];
+        const key = r * this.nCli + this.cli[i];
+        pair.set(key, (pair.get(key) || 0) + l);
+      }
+      pair.forEach((v, key) => { if (v > 0.005 && this.p.cli[key % this.nCli].t === "J") o.pos[Math.floor(key / this.nCli)]++; });
+      return o;
+    }
+
     rowIds(mk) {
       const out = new Array(mk.count);
       let k = 0;

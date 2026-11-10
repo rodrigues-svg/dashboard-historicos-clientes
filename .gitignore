@@ -12,3 +12,4 @@ site/data/*.js
 
 __pycache__/
 *.pyc
+apps_script/equipe.json
