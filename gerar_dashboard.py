@@ -636,7 +636,7 @@ def montar_payload(d, u, meta, registro, usuarios, dia=None, validades=None, met
         # datas da 1ª/2ª tendência (da agenda) e link do Forms: dentro do payload cifrado, não no site público
         payload["tendencias"] = {"datas": TENDENCIAS["datas"], "formUrl": TENDENCIAS.get("form_url", "")}
     if AVALIACAO.get("excluir") and u.tipo != "RCA":
-        payload["avaliacao"] = {"excluir": AVALIACAO["excluir"]}
+        payload["avaliacao"] = {"excluir": AVALIACAO["excluir"], "apelidos": AVALIACAO.get("apelidos", {})}
     if u.tipo == "Gerente":
         payload["admin"] = {"usuarios": [{
             "nome": x.nome, "tipo": x.tipo, "email": x.login, "pendente": x.pendente,

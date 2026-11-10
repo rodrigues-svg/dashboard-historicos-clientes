@@ -43,7 +43,9 @@
     const p = A.ctx.p, sem = (x) => NV.norm(x).toUpperCase().replace(/[^A-Z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
     const fora = new Set(((p.avaliacao || {}).excluir || []).map(sem));
     const equipe = p.rca.map((r) => ({ c: r.c, n: r.n.replace(/ \(carteira própria\)$/, ""), t: sem(r.n.replace(/ \(carteira própria\)$/, "")).split(" ") }));
+    const apelidos = new Map(Object.entries((p.avaliacao || {}).apelidos || {}).map(([n, c]) => [sem(n), +c]));
     const casa = (nome) => {
+      if (apelidos.has(sem(nome))) { const r = equipe.find((x) => x.c === apelidos.get(sem(nome))); if (r) return r; }
       const cod = (nome.match(/^\s*(\d+)/) || [])[1];
       if (cod) { const r = equipe.find((x) => x.c === +cod); if (r) return r; }
       const t = sem(nome.replace(/^\s*\d+\s*-\s*/, "")).split(" ").filter((x) => x.length > 1);
