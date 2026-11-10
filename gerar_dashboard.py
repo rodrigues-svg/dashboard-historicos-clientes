@@ -77,6 +77,7 @@ COLUNAS_OBRIGATORIAS = [
 # Não fica no código (o repositório é público): é montada a partir do usuarios.csv,
 # que no CI vem do secret USUARIOS_CSV.
 # --------------------------------------------------------------------------
+AVALIACAO = {}         # bloco "avaliacao" do config (vendedores a ignorar nos resultados)
 TENDENCIAS = {}        # bloco "tendencias" do config (datas da 1ª/2ª tendência, link do Forms, rótulos do Forms)
 SUPERVISORES = {}      # codigo -> nome
 RCAS = {}              # codigo -> (nome, codigo do supervisor)
@@ -531,6 +532,8 @@ def montar_payload(d, u, meta, registro, usuarios, dia=None):
     if TENDENCIAS.get("datas"):
         # datas da 1ª/2ª tendência (da agenda) e link do Forms: dentro do payload cifrado, não no site público
         payload["tendencias"] = {"datas": TENDENCIAS["datas"], "formUrl": TENDENCIAS.get("form_url", "")}
+    if AVALIACAO.get("excluir") and u.tipo != "RCA":
+        payload["avaliacao"] = {"excluir": AVALIACAO["excluir"]}
     if u.tipo == "Gerente":
         payload["admin"] = {"usuarios": [{
             "nome": x.nome, "tipo": x.tipo, "email": x.login, "pendente": x.pendente,
@@ -805,6 +808,7 @@ def main():
     if CONFIG_LOCAL.exists():                             # ajustes só desta máquina (fora do Git): excel_padrao, base_url...
         cfg.update(json.loads(CONFIG_LOCAL.read_text(encoding="utf-8")))
     TENDENCIAS.update(cfg.get("tendencias") or {})
+    AVALIACAO.update(cfg.get("avaliacao") or {})
     ap = argparse.ArgumentParser(description="Gerador do Dashboard Consulta Históricos de Clientes")
     ap.add_argument("--excel", help="caminho da planilha analítica (padrão: config.json)")
     ap.add_argument("--gmail", action="store_true", help="baixa a planilha do e-mail (usa token.json)")

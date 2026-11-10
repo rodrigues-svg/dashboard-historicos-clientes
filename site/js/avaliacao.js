@@ -37,10 +37,31 @@
     return l;
   }
 
+  /* nomes digitados no Forms ("DIOGO MARTINS", "1132 - DIOGO ADILSON MARTINS"...) viram o vendedor da equipe quando
+     batem sem ambiguidade; os da lista de exclusão (ex-vendedores, outras empresas) saem dos resultados */
+  function ajustar(linhas) {
+    const p = A.ctx.p, sem = (x) => NV.norm(x).toUpperCase().replace(/[^A-Z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+    const fora = new Set(((p.avaliacao || {}).excluir || []).map(sem));
+    const equipe = p.rca.map((r) => ({ c: r.c, n: r.n.replace(/ \(carteira própria\)$/, ""), t: sem(r.n.replace(/ \(carteira própria\)$/, "")).split(" ") }));
+    const casa = (nome) => {
+      const cod = (nome.match(/^\s*(\d+)/) || [])[1];
+      if (cod) { const r = equipe.find((x) => x.c === +cod); if (r) return r; }
+      const t = sem(nome.replace(/^\s*\d+\s*-\s*/, "")).split(" ").filter((x) => x.length > 1);
+      const ok = equipe.filter((r) => t.length && t.every((x) => r.t.includes(x)));
+      if (ok.length === 1) return ok[0];
+      const pn = equipe.filter((r) => t.length && r.t[0] === t[0]);     // senão, o primeiro nome, se for único na equipe
+      return pn.length === 1 ? pn[0] : null;
+    };
+    return linhas.filter((l) => !fora.has(sem(l.vendedor))).map((l) => {
+      const r = l.rca ? equipe.find((x) => x.c === l.rca) || casa(l.vendedor) : casa(l.vendedor);
+      return r ? Object.assign({}, l, { rca: r.c, vendedor: r.n }) : l;
+    });
+  }
+
   async function carregar(forca) {
     if (A.carregado && !forca) return;
     A.erro = "";
-    try { A.linhas = (await NV.remote.call("avaliacoes_ler", A.ctx.token)).linhas || []; A.carregado = true; }
+    try { A.linhas = ajustar((await NV.remote.call("avaliacoes_ler", A.ctx.token)).linhas || []); A.carregado = true; }
     catch (x) { A.erro = x.message || "Não foi possível carregar as avaliações."; }
   }
 
