@@ -317,16 +317,16 @@
     renderFooter(); renderHist(); setupHomeLab(); renderHome();
     commit();
     const ctx = { p, eng: S.eng, token: TOKEN };
-    const comTend = NV.trend.init(ctx), comEstoque = NV.stock.init(ctx);
-    $("#app-nav").hidden = !(comTend || comEstoque);
+    const comTend = NV.trend.init(ctx), comEstoque = NV.stock.init(ctx), comAval = NV.aval.init(ctx);
+    $("#app-nav").hidden = !(comTend || comEstoque || comAval);
     /* tela inicial: um botão para cada função disponível (sem funções extras, abre direto em Clientes) */
     $("#hub-title").textContent = "Olá, " + u.nome.split(" ")[0] + "!";
     $$(".hub-tile").forEach((t) => { const b = $("#app-nav [data-view=" + t.dataset.goView + "]"); t.hidden = !!(b && b.hidden); });
-    showView(comTend || comEstoque ? "home" : "hist");
+    showView(comTend || comEstoque || comAval ? "home" : "hist");
     NV.remote.logLogin(TOKEN);
   }
 
-  /* funções do aplicativo (menu de cima e tela inicial): Início, Clientes, Tendências e Estoque */
+  /* funções do aplicativo (menu de cima e tela inicial): Início, Clientes, Tendências, Estoque e Avaliação */
   function showView(v) {
     document.body.dataset.view = v;
     $$("#app-view > main[data-view]").forEach((m) => { m.hidden = m.dataset.view !== v; });
@@ -334,6 +334,7 @@
     scrollTo(0, 0);
     if (v === "trend") NV.trend.mostrar();
     if (v === "stock") NV.stock.mostrar();
+    if (v === "aval") NV.aval.mostrar();
   }
 
   function renderFooter() {

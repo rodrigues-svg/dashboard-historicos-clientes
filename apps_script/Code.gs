@@ -30,6 +30,14 @@ const ABA_TEND_FORMS = 'Tendencias_Forms';      // espelho (IMPORTRANGE) da plan
 const ABA_ESTOQUE = 'Estoque';                  // contagens de estoque nos clientes (uma linha por produto contado)
 const CAB_ESTOQUE = ['Carimbo', 'Data da contagem', 'ID da contagem', 'Cliente (cód.)', 'Cliente', 'RCA (cód.)', 'Produto', 'Família', 'Quantidade', 'Usuário'];
 const LIMITE_CONTAGENS_POR_DIA = 60;
+const ABA_AVAL_APP = 'Avaliacoes';              // avaliações feitas no aplicativo (mesmas colunas do Forms + códigos e origem)
+const ABA_AVAL_FORMS = 'Avaliacoes_Forms';      // espelho (IMPORTRANGE) das respostas do Forms de avaliação qualitativa
+const CRIT_AVAL = ['plano', 'imagem', 'quebra', 'pdv', 'novos', 'campanhas', 'proposta', 'objecoes'];
+const CAB_AVAL = ['Carimbo de data/hora', 'Nome Completo Gestor:', 'Data:', 'Nome Vendedor:', 'Razão Social Cliente:', 'CIDADE:', 'PLANO DA VISITA (OBJETIVO - META)',
+  'IMAGEM PESSOAL - POSTURA - PONTUALIDADE', 'QUEBRA GELO - CONEXÃO COM TODOS', 'OBSERVAÇÃO PDV - NECESSIDADES E OPORTUNIDADES', 'ATIVIDADES REALIZADAS NA VISITA:',
+  'POSITIVAÇÃO NOVOS ITENS:', 'APRESENTAÇÃO CAMPANHAS E PROMOCIONAIS CONFORME HISTÓRICO E POTENCIAL DO CLIENTE:', 'MONTAGEM E APRESENTAÇÃO PROPOSTA//PEDIDO:',
+  'ANOTAÇÕES OBJEÇÕES E/OU OPORTUNIDADES:', 'NOTA FINAL GERAL DA VISITA:', 'OBSERVAÇÕES FINAIS GERAIS:', 'RCA (cód.)', 'Cliente (cód.)', 'Origem'];
+const LIMITE_AVALIACOES_POR_DIA = 40;
 const MESES_ = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
 const CAB_TEND = ['Carimbo de data/hora', 'Endereço de e-mail', 'QUAL SEU SUPERVISOR?', 'QUEM É VOCÊ?', 'TENDÊNCIA DE QUAL O MÊS VOCÊ ESTÁ RESPONDENDO?',
   'QUAL TENDÊNCIA VOCÊS ESTÁ RESPONDENDO?', 'TENDÊNCIA GERAL (R$)', 'MSD (R$)', 'BRAVECTO (unidades)', 'FUN PADS', 'IDEXX (R$)', 'POSITIVAÇÃO DE CNPJ', 'Origem'];
@@ -48,6 +56,8 @@ function doPost(e) {
     if (req.action === 'tendencia_salvar') return tendenciaSalvar_(auth, req);
     if (req.action === 'estoque_ler') return estoqueLer_(auth, req);
     if (req.action === 'estoque_salvar') return estoqueSalvar_(auth, req);
+    if (req.action === 'avaliacoes_ler') return avaliacoesLer_(auth);
+    if (req.action === 'avaliacao_salvar') return avaliacaoSalvar_(auth, req);
     return json_({ ok: false, erro: 'Ação desconhecida.' });
   } catch (err) {
     return json_({ ok: false, erro: 'Erro no servidor: ' + err.message });
@@ -261,6 +271,75 @@ function estoqueSalvar_(auth, req) {
   registrar_(u, 'estoque', cli + ' ' + nome.slice(0, 40) + ' | ' + data + ' | ' + linhas.length + ' produtos');
   return json_({ ok: true, id: id });
 }
+
+/* ------------------------------------------------------------------ avaliação qualitativa */
+/** Avaliações do Forms (espelho) e do aplicativo. Gerente: todas; supervisor: da equipe (ou feitas por ele); RCA: nenhuma. */
+function avaliacoesLer_(auth) {
+  const u = auth.user, eq = equipe_();
+  if (u.p === 'RCA') return json_({ ok: false, erro: 'A avaliação qualitativa é dos supervisores e do gerente.' });
+  const porNome = {};
+  Object.keys(eq.rca).forEach(function (c) { porNome[semAcento_(eq.rca[c].n)] = parseInt(c, 10); });
+  const planilha = SpreadsheetApp.getActiveSpreadsheet(), linhas = [];
+  [[ABA_AVAL_FORMS, 'forms'], [ABA_AVAL_APP, 'app']].forEach(function (par) {
+    const aba = planilha.getSheetByName(par[0]);
+    if (!aba || aba.getLastRow() < 2) return;
+    aba.getRange(2, 1, aba.getLastRow() - 1, Math.min(20, aba.getMaxColumns())).getValues().forEach(function (v) {
+      const ts = carimbo_(v[0]);
+      if (!ts || !String(v[3] || '').trim()) return;
+      const rca = parseInt(v[17], 10) || porNome[semAcento_(v[3])] || 0;
+      const gestor = String(v[1] || '').trim();
+      const meu = semAcento_(gestor).split(' ')[0] === semAcento_(u.n).split(' ')[0];
+      if (u.p !== 'Gerente' && !meu && !(rca && podeVer_(u, rca, eq))) return;
+      const d = v[2] instanceof Date ? Utilities.formatDate(v[2], FUSO, 'yyyy-MM-dd') : dataIso_(v[2]) || Utilities.formatDate(new Date(ts), FUSO, 'yyyy-MM-dd');
+      const notas = {};
+      [6, 7, 8, 9, 11, 12, 13, 14].forEach(function (col, k) { notas[CRIT_AVAL[k]] = notaAval_(v[col]); });
+      linhas.push({ ts: ts, data: d, gestor: gestor, vendedor: String(v[3]).trim(), cliente: String(v[4] || '').trim(), cidade: String(v[5] || '').trim(),
+        notas: notas, ativ: String(v[10] || ''), final: notaAval_(v[15]), obs: String(v[16] || ''), rca: rca, o: par[1] });
+    });
+  });
+  return json_({ ok: true, linhas: linhas });
+}
+
+function avaliacaoSalvar_(auth, req) {
+  const u = auth.user, eq = equipe_();
+  if (u.p === 'RCA') return json_({ ok: false, erro: 'A avaliação qualitativa é feita pelo supervisor ou pelo gerente.' });
+  const rca = parseInt(req.rca, 10), info = eq.rca[String(rca)];
+  if (!info) return json_({ ok: false, erro: 'Vendedor não encontrado na equipe.' });
+  if (!podeVer_(u, rca, eq)) return json_({ ok: false, erro: 'Vendedor fora da sua equipe.' });
+  const data = String(req.data || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || data > Utilities.formatDate(new Date(), FUSO, 'yyyy-MM-dd')) return json_({ ok: false, erro: 'Data da visita inválida.' });
+  const n = req.notas || {}, notas = [];
+  for (var k = 0; k < CRIT_AVAL.length; k++) {
+    const x = parseInt(n[CRIT_AVAL[k]], 10);
+    if (!(x >= 1 && x <= 5)) return json_({ ok: false, erro: 'Falta nota (1 a 5) em algum critério.' });
+    notas.push(x);
+  }
+  const final = parseInt(req.final, 10);
+  if (!(final >= 1 && final <= 5)) return json_({ ok: false, erro: 'Falta a nota final (1 a 5).' });
+  if (!String(req.cliente || '').trim()) return json_({ ok: false, erro: 'Informe o cliente visitado.' });
+  if (!consumirCota_(auth.hash, 'a', LIMITE_AVALIACOES_POR_DIA)) return json_({ ok: false, erro: 'Limite diário de avaliações atingido.' });
+  const dd = data.split('-').reverse().join('/'), z = function (x) { return '0' + x; };
+  const linha = [new Date(), u.n, dd, String(req.vendedor || info.n).slice(0, 80), String(req.cliente).slice(0, 120), String(req.cidade || '').slice(0, 60),
+    z(notas[0]), z(notas[1]), z(notas[2]), z(notas[3]), String(req.ativ || '').slice(0, 200), z(notas[4]), z(notas[5]), z(notas[6]), z(notas[7]), z(final),
+    String(req.obs || '').slice(0, 1000), rca, parseInt(req.cli, 10) || '', 'APP: ' + u.n];
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const planilha = SpreadsheetApp.getActiveSpreadsheet();
+    let aba = planilha.getSheetByName(ABA_AVAL_APP);
+    if (!aba) { aba = planilha.insertSheet(ABA_AVAL_APP); aba.appendRow(CAB_AVAL); aba.setFrozenRows(1); }
+    const ln = aba.getLastRow() + 1;
+    aba.getRange(ln, 3).setNumberFormat('@');
+    aba.getRange(ln, 7, 1, 10).setNumberFormat('@');
+    aba.getRange(ln, 1, 1, linha.length).setValues([linha]);
+    aba.getRange(ln, 1).setNumberFormat('dd/MM/yyyy HH:mm:ss');
+  } finally { lock.releaseLock(); }
+  registrar_(u, 'avaliacao', info.n + ' | ' + String(req.cliente).slice(0, 40) + ' | ' + data + ' | nota ' + final);
+  return json_({ ok: true });
+}
+
+function notaAval_(v) { const x = parseInt(String(v === null || v === undefined ? '' : v).replace(/\D/g, ''), 10); return x >= 1 && x <= 5 ? x : null; }
+function dataIso_(v) { const m = String(v || '').match(/^(\d{2})\/(\d{2})\/(\d{4})/); return m ? m[3] + '-' + m[2] + '-' + m[1] : ''; }
 
 /* ------------------------------------------------------------------ apoio */
 function autenticar_(token) {
