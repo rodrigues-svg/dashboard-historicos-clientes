@@ -44,6 +44,8 @@
     <symbol id="i-file" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></g></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></g></symbol>
     <symbol id="i-trend" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></g></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></g></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></g></symbol>
     <symbol id="i-clock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></g></symbol>
     <symbol id="i-star" viewBox="0 0 24 24"><polygon fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></symbol>
     <symbol id="i-users" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></g></symbol>
@@ -113,7 +115,10 @@
   <!-- funções do aplicativo -->
   <nav id="app-nav" class="app-nav" aria-label="Funções do aplicativo">
     <button type="button" data-view="home" aria-current="page"><svg><use href="#i-home"/></svg><span>Início</span></button>
+    <button type="button" data-view="mes" hidden><svg><use href="#i-target"/></svg><span>Meu mês</span></button>
     <button type="button" data-view="hist"><svg><use href="#i-users"/></svg><span>Clientes</span></button>
+    <button type="button" data-view="oport"><svg><use href="#i-trend"/></svg><span>Oportunidades</span></button>
+    <button type="button" data-view="prod"><svg><use href="#i-search"/></svg><span>Produtos</span></button>
     <button type="button" data-view="trend"><svg><use href="#i-trend"/></svg><span>Tendências</span><i class="dot" id="trend-dot" hidden></i></button>
     <button type="button" data-view="stock"><svg><use href="#i-box"/></svg><span>Estoque</span></button>
     <button type="button" data-view="val" hidden><svg><use href="#i-clock"/></svg><span>Validades</span></button>
@@ -128,8 +133,14 @@
     <section class="card hub" aria-labelledby="hub-title">
       <div class="card-head"><div><h2 id="hub-title">Olá!</h2><p id="hub-sub">Escolha o que você quer fazer.</p></div></div>
       <div class="hub-grid">
+        <button type="button" class="hub-tile" data-go-view="mes"><span class="hub-ic"><svg><use href="#i-target"/></svg></span>
+          <b>Meu mês</b><small>Meta x vendido, ritmo do mês, quanto vender por dia útil e ranking da equipe.</small></button>
         <button type="button" class="hub-tile" data-go-view="hist"><span class="hub-ic"><svg><use href="#i-users"/></svg></span>
           <b>Clientes</b><small>Painel do mês, histórico de compras, rankings e PDF do cliente.</small></button>
+        <button type="button" class="hub-tile" data-go-view="oport"><span class="hub-ic"><svg><use href="#i-trend"/></svg></span>
+          <b>Oportunidades</b><small>Famílias que caíram ou cresceram no ano e os clientes com as maiores quedas.</small></button>
+        <button type="button" class="hub-tile" data-go-view="prod"><span class="hub-ic"><svg><use href="#i-search"/></svg></span>
+          <b>Produtos</b><small>Busque um produto e veja quem comprou e quando.</small></button>
         <button type="button" class="hub-tile" data-go-view="trend"><span class="hub-ic"><svg><use href="#i-trend"/></svg></span>
           <b>Tendências</b><small>Preencher a 1ª e a 2ª tendência e acompanhar contra o realizado.</small><i class="dot" id="hub-trend-dot" hidden></i></button>
         <button type="button" class="hub-tile" data-go-view="stock"><span class="hub-ic"><svg><use href="#i-box"/></svg></span>
@@ -163,6 +174,10 @@
     <section id="stock-prop" class="card" hidden></section>
     <section id="stock-hist" class="card" hidden></section>
   </main>
+
+  <main class="content" id="view-mes" data-view="mes" hidden><section id="mes-card" class="card"></section></main>
+  <main class="content" id="view-oport" data-view="oport" hidden><section id="oport-card" class="card"></section></main>
+  <main class="content" id="view-prod" data-view="prod" hidden><section id="prod-card" class="card"></section></main>
 
   <main class="content" id="view-val" data-view="val" hidden>
     <section id="val-card" class="card"></section>
@@ -417,6 +432,7 @@
 <script src="js/estoque.js" defer></script>
 <script src="js/avaliacao.js" defer></script>
 <script src="js/validades.js" defer></script>
+<script src="js/painel.js" defer></script>
 <script src="js/app.js" defer></script>
 </body>
 </html>

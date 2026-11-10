@@ -458,6 +458,53 @@ def obter_validades(cfg, token_path, verificar_remetente=True):
     return {"data": data.group(1) if data else "", "itens": itens}
 
 
+def obter_metas(cfg, token_path, verificar_remetente=True):
+    """Opcional (bloco 'gmail_metas'): metas do mês por RCA (valor, positivação e por fornecedor), dos relatórios diários.
+    Devolve {"ym": mês das metas, "rca": {código: {"v": meta R$, "p": meta positivação, "f": {fornecedor: meta R$}}}}."""
+    g = cfg.get("gmail_metas")
+    if not g:
+        return None
+    metas, ym = {}, None
+
+    def baixar(assunto):
+        nonlocal ym
+        bloco = {"x": {"remetente": g["remetente"], "assunto": assunto, "dias": g.get("dias", 4)}}
+        caminho, origem = baixar_do_gmail(bloco, token_path, verificar_remetente, bloco="x")
+        try:
+            df = pd.read_excel(caminho, sheet_name=0)
+        finally:
+            Path(caminho).unlink(missing_ok=True)
+        dm = re.search(r"(\d{2})/(\d{2})/(\d{4})", origem)
+        if dm:
+            ym = int(dm.group(3)) * 12 + int(dm.group(2)) - 1
+        return df
+
+    def codigo(v):
+        m = re.match(r"^\s*(\d+)", str(v))
+        return int(m.group(1)) if m else None
+
+    try:
+        for chave, col in (("valor", "v"), ("positivacao", "p")):
+            df = baixar(g[chave])
+            meta_col = [c for c in df.columns if sem_acento(c).upper().startswith("META")][0]
+            for _, r in df.iterrows():
+                cod = codigo(r.iloc[1])
+                if cod is not None and pd.notna(r[meta_col]):
+                    metas.setdefault(cod, {"v": 0, "p": 0, "f": {}})[col] = float(r[meta_col])
+        df = baixar(g["fornecedor"])
+        meta_col = [c for c in df.columns if sem_acento(c).upper().startswith("META")][0]
+        for _, r in df.iterrows():
+            cod = codigo(r.iloc[1])
+            if cod is None or str(r.iloc[2]).strip().upper() == "TOTAL" or pd.isna(r[meta_col]):
+                continue
+            metas.setdefault(cod, {"v": 0, "p": 0, "f": {}})["f"][normalizar_fornecedor(r.iloc[2])] = float(r[meta_col])
+    except (SystemExit, Exception) as e:
+        print(f"::warning::Metas indisponíveis ({e}).")
+        return None
+    print(f"  Metas: {len(metas)} RCAs")
+    return {"ym": ym, "rca": metas}
+
+
 def normalizar_fornecedor(bruto):
     s = re.sub(r"^\s*\d+\s*-\s*", "", str(bruto)).replace("*", "").strip().upper()
     if "PRIMORE" in s:
@@ -528,7 +575,7 @@ def recorte_do_usuario(d, u):
     return d[d.rca_cod == u.codigo]
 
 
-def montar_payload(d, u, meta, registro, usuarios, dia=None, validades=None):
+def montar_payload(d, u, meta, registro, usuarios, dia=None, validades=None, metas=None):
     sub = recorte_do_usuario(d, u)
     sup_cods = sorted(sub.sup_cod.unique().tolist())
     sup_idx = {c: i for i, c in enumerate(sup_cods)}
@@ -582,6 +629,9 @@ def montar_payload(d, u, meta, registro, usuarios, dia=None, validades=None):
                           "liq": sd.liq.astype(int).tolist(), "venda": sd.venda.astype(int).tolist()}
     if validades:
         payload["validades"] = validades
+    if metas and metas.get("rca"):
+        cods = set(sub.rca_cod.unique().tolist())          # só as metas da carteira/equipe do usuário
+        payload["metas"] = {"ym": metas["ym"], "rca": {str(k): v for k, v in metas["rca"].items() if k in cods}}
     if TENDENCIAS.get("datas"):
         # datas da 1ª/2ª tendência (da agenda) e link do Forms: dentro do payload cifrado, não no site público
         payload["tendencias"] = {"datas": TENDENCIAS["datas"], "formUrl": TENDENCIAS.get("form_url", "")}
@@ -617,7 +667,7 @@ def cifrar(payload, token, u):
     return {"v": 1, "it": PBKDF2_ITER, "salt": b64(salt), "iv": b64(iv), "ct": b64(ct)}, len(bruto)
 
 
-def escrever_dados(d, usuarios, registro, meta, silencioso=False, dia=None, validades=None):
+def escrever_dados(d, usuarios, registro, meta, silencioso=False, dia=None, validades=None, metas=None):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     for antigo in DATA_DIR.glob("*.js"):
         antigo.unlink()                                  # tokens renovados/revogados somem do site
@@ -626,7 +676,7 @@ def escrever_dados(d, usuarios, registro, meta, silencioso=False, dia=None, vali
         reg = registro["usuarios"][u.uid]
         if reg["status"] != "ativo":
             continue
-        payload = montar_payload(d, u, meta, registro, usuarios, dia, validades)
+        payload = montar_payload(d, u, meta, registro, usuarios, dia, validades, metas)
         blob, bruto = cifrar(payload, reg["token"], u)
         arq = DATA_DIR / f"{fid_do_token(reg['token'])}.js"
         arq.write_text("window.__nv_blob=" + json.dumps(blob, separators=(",", ":")) + ";", encoding="utf-8")
@@ -943,12 +993,13 @@ def main():
         dia, _ = obter_diario(cfg, args.token_path, mapa_supervisores(bruto_df),
                               verificar_remetente=not args.sem_verificar_remetente)
     validades = obter_validades(cfg, args.token_path, verificar_remetente=not args.sem_verificar_remetente) if args.gmail else None
+    metas = obter_metas(cfg, args.token_path, verificar_remetente=not args.sem_verificar_remetente) if args.gmail else None
     meta = {"geradoEm": agora().isoformat(timespec="seconds"), "fonte": meta_fonte}
     print("Gerando dados criptografados por usuário ...")
     preparar_assets()
     if args.ci:
         versionar_assets()
-    escrever_dados(d, usuarios, registro, meta, silencioso=args.ci, dia=dia, validades=validades)
+    escrever_dados(d, usuarios, registro, meta, silencioso=args.ci, dia=dia, validades=validades, metas=metas)
     n = gerar_lista_apps_script(usuarios, registro)
     print(f"apps_script/usuarios_autorizados.json: {n} usuário(s) autorizado(s) a enviar e-mail.")
 
