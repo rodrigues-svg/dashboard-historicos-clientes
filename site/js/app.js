@@ -316,14 +316,17 @@
     $$("#view-seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === "chart")));
     renderFooter(); renderHist(); setupHomeLab(); renderHome();
     commit();
-    showView("hist");
     const ctx = { p, eng: S.eng, token: TOKEN };
     const comTend = NV.trend.init(ctx), comEstoque = NV.stock.init(ctx);
     $("#app-nav").hidden = !(comTend || comEstoque);
+    /* tela inicial: um botão para cada função disponível (sem funções extras, abre direto em Clientes) */
+    $("#hub-title").textContent = "Olá, " + u.nome.split(" ")[0] + "!";
+    $$(".hub-tile").forEach((t) => { const b = $("#app-nav [data-view=" + t.dataset.goView + "]"); t.hidden = !!(b && b.hidden); });
+    showView(comTend || comEstoque ? "home" : "hist");
     NV.remote.logLogin(TOKEN);
   }
 
-  /* funções do aplicativo (menu de cima): Clientes, Tendências e Estoque */
+  /* funções do aplicativo (menu de cima e tela inicial): Início, Clientes, Tendências e Estoque */
   function showView(v) {
     document.body.dataset.view = v;
     $$("#app-view > main[data-view]").forEach((m) => { m.hidden = m.dataset.view !== v; });
@@ -654,6 +657,8 @@
       S.chartView = b.dataset.v; $$("#view-seg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); renderChart();
     }));
     $$("#app-nav button").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
+    $$(".hub-tile").forEach((t) => t.addEventListener("click", () => showView(t.dataset.goView)));
+    $(".topbar .logo-chip").addEventListener("click", (ev) => { if (!$("#app-nav").hidden) { ev.preventDefault(); showView("home"); } });
     $("#alert-go").addEventListener("click", () => { showView("trend"); setTimeout(() => NV.trend.irParaResponder(), 80); });
     $("#trend-share").addEventListener("click", () => NV.trend.abrirImagem());
     $("#trend-img-share").addEventListener("click", () => NV.trend.compartilhar());

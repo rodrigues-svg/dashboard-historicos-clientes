@@ -484,6 +484,21 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   .tgrid, .tgrid.t3 { grid-template-columns: 1fr; }
 }
 
+/* ---------- tela inicial (um botão por função) ---------- */
+.hub-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); padding: 8px 18px 18px; }
+.hub-tile { position: relative; display: grid; gap: 8px; justify-items: start; text-align: left; padding: 20px; border: 1px solid var(--line); border-radius: 16px;
+  background: var(--surface); color: var(--ink); cursor: pointer; transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease; }
+.hub-tile[hidden] { display: none; }
+.hub-tile:hover, .hub-tile:focus-visible { border-color: var(--primary); box-shadow: var(--shadow); transform: translateY(-2px); }
+.hub-tile b { font-size: 18px; }
+.hub-tile small { color: var(--ink-3); font-size: 13px; line-height: 1.4; }
+.hub-ic { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 14px; background: var(--primary-wash, rgba(201, 75, 94, .12)); color: var(--primary); }
+.hub-ic svg { width: 26px; height: 26px; }
+.hub-tile .dot { position: absolute; top: 14px; right: 14px; width: 14px; height: 14px; border-radius: 50%; background: #E5484D; animation: dot-pulse 1.6s ease-in-out infinite; }
+.hub-tile .dot[hidden] { display: none; }
+body[data-view="home"] .bottombar { display: none !important; }
+@media (max-width: 767px) { .hub-grid { grid-template-columns: 1fr; padding: 6px 14px 14px; } .hub-tile { grid-template-columns: 48px 1fr; column-gap: 14px; align-items: center; } .hub-tile .hub-ic { grid-row: span 2; } }
+
 /* ---------- estoque do cliente ---------- */
 .stock-res { display: grid; gap: 6px; margin-top: 10px; max-height: 360px; overflow: auto; }
 .stock-op { display: grid; gap: 2px; text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); cursor: pointer; }

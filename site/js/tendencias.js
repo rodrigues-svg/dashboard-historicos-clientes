@@ -107,7 +107,7 @@
 
   function atualizarAlerta() {
     const a = alerta(), barra = $("#alert-bar");
-    $("#trend-dot").hidden = !a;
+    $("#trend-dot").hidden = !a; $("#hub-trend-dot").hidden = !a;
     if (!a) { barra.hidden = true; return; }
     $("#alert-text").textContent = a.texto;
     $("#alert-go").textContent = T.ctx.p.user.tipo === "RCA" ? "Responder agora" : "Ver tendências";
@@ -372,7 +372,7 @@
       T.form = { rca: 0, n: 1 };
       const ativo = !!ctx.p.tendencias && !!NV.remote.endpoint;
       $("#app-nav [data-view=trend]").hidden = !ativo;
-      $("#alert-bar").hidden = true; $("#trend-dot").hidden = true;
+      $("#alert-bar").hidden = true; $("#trend-dot").hidden = true; $("#hub-trend-dot").hidden = true;
       if (!ativo) return false;
       carregar(true).then(atualizarAlerta);
       return true;
