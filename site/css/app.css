@@ -440,7 +440,7 @@ code, .code { font: 12px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; 
 .alert-bar span { flex: 1; min-width: 0; }
 @keyframes bell { 0%, 70%, 100% { transform: rotate(0); } 75% { transform: rotate(14deg); } 80% { transform: rotate(-12deg); } 85% { transform: rotate(8deg); } 90% { transform: rotate(-6deg); } }
 @media (min-width: 1449px) { .alert-bar { margin-left: auto; margin-right: auto; } }
-body[data-view="trend"] .bottombar { display: none !important; }
+body[data-view="trend"] .bottombar, body[data-view="stock"] .bottombar { display: none !important; }
 .trend-status { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 8px 18px 18px; }
 .tstat { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2, var(--zebra)); }
 .tstat.on { border-color: var(--primary); }
@@ -483,6 +483,33 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   .trend-status { padding: 6px 14px 14px; grid-template-columns: 1fr; }
   .tgrid, .tgrid.t3 { grid-template-columns: 1fr; }
 }
+
+/* ---------- estoque do cliente ---------- */
+.stock-res { display: grid; gap: 6px; margin-top: 10px; max-height: 360px; overflow: auto; }
+.stock-op { display: grid; gap: 2px; text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.stock-op:hover { border-color: var(--primary); }
+.stock-op small { color: var(--ink-3); }
+#stock-pick input[type=search] { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--surface); color: var(--ink); font-size: 15px; }
+.stock-form { display: grid; gap: 14px; }
+.fam { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.fam-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--zebra); }
+.fam-head span { color: var(--ink-3); font-size: 12px; }
+.fam-tot { margin-left: auto; font-style: normal; font-weight: 700; color: var(--primary); }
+.prod-row { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-top: 1px solid var(--line); }
+.prod-n { flex: 1; min-width: 0; display: grid; gap: 2px; font-size: 14px; }
+.prod-n small { color: var(--ink-3); font-size: 12px; }
+.prod-row input, input.mini { width: 96px; min-height: 40px; padding: 0 10px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 15px; text-align: right; }
+.stock-add input, .tfield.inline input { min-height: 40px; padding: 0 10px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 14px; }
+.stock-add input { width: 100%; }
+.stock-foot { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 18px; }
+.stock-foot > span { font-size: 15px; }
+.tfield.inline { display: grid; gap: 4px; }
+.stock-hlist { display: grid; gap: 8px; }
+.stock-h { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+.stock-h summary { display: flex; flex-wrap: wrap; gap: 6px 14px; cursor: pointer; align-items: baseline; }
+.stock-h summary small { color: var(--ink-3); margin-left: auto; }
+.home-lab input[type=date] { min-height: 32px; padding: 0 8px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--surface); color: var(--ink); }
+@media (max-width: 767px) { .prod-row input { width: 80px; } .stock-foot .btn { flex: 1 1 100%; } }
 
 /* ---------- abertura animada ---------- */
 .splash { position: fixed; inset: 0; z-index: 2000; display: grid; place-content: center; justify-items: center; gap: 10px; text-align: center;

@@ -208,6 +208,26 @@
       return o;
     }
 
+    /* produtos que o cliente trabalha (compras de ymLo a ymHi): quantidade por mês, último preço unitário e RCA principal */
+    cliProdutos(c, ymLo, ymHi) {
+      const out = new Map(), porRca = new Map();
+      for (let i = 0; i < this.n; i++) {
+        if (this.cli[i] !== c) continue;
+        const y = this.ym[i];
+        if (y < ymLo || y > ymHi) continue;
+        const pr = this.prod[i];
+        let o = out.get(pr);
+        if (!o) out.set(pr, (o = { prod: pr, qtd: 0, liq: 0, meses: new Map(), ultYm: -1, preco: 0 }));
+        o.qtd += this.qtd[i]; o.liq += this.liq[i];
+        o.meses.set(y, (o.meses.get(y) || 0) + this.qtd[i]);
+        if (this.qtd[i] > 0 && this.liq[i] > 0 && y >= o.ultYm) { o.ultYm = y; o.preco = this.liq[i] / this.qtd[i]; }
+        porRca.set(this.rca[i], (porRca.get(this.rca[i]) || 0) + this.liq[i]);
+      }
+      let rca = -1, maior = -Infinity;
+      porRca.forEach((v, r) => { if (v > maior) { maior = v; rca = r; } });
+      return { itens: [...out.values()].filter((o) => o.qtd > 0), rca };
+    }
+
     rowIds(mk) {
       const out = new Array(mk.count);
       let k = 0;

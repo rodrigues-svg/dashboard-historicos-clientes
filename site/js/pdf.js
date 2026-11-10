@@ -135,6 +135,8 @@
     },
     tendenciasLer(token) { return this.call("tendencias_ler", token); },
     tendenciaSalvar(token, dados) { return this.call("tendencia_salvar", token, dados); },
+    estoqueLer(token, cli) { return this.call("estoque_ler", token, { cli }); },
+    estoqueSalvar(token, dados) { return this.call("estoque_salvar", token, dados); },
     async fetchLog(token) {
       const res = await fetch(this.endpoint + (this.endpoint.includes("?") ? "&" : "?") + "action=log&token=" + encodeURIComponent(token), { redirect: "follow" });
       const j = await res.json();

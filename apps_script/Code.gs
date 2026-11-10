@@ -27,6 +27,9 @@ const FUSO = 'America/Sao_Paulo';
 const ABA_LOG = 'Log';
 const ABA_TEND_APP = 'Tendencias';              // respostas digitadas no aplicativo (mesmas colunas do Forms + Origem)
 const ABA_TEND_FORMS = 'Tendencias_Forms';      // espelho (IMPORTRANGE) da planilha de respostas do Google Forms
+const ABA_ESTOQUE = 'Estoque';                  // contagens de estoque nos clientes (uma linha por produto contado)
+const CAB_ESTOQUE = ['Carimbo', 'Data da contagem', 'ID da contagem', 'Cliente (cód.)', 'Cliente', 'RCA (cód.)', 'Produto', 'Família', 'Quantidade', 'Usuário'];
+const LIMITE_CONTAGENS_POR_DIA = 60;
 const MESES_ = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
 const CAB_TEND = ['Carimbo de data/hora', 'Endereço de e-mail', 'QUAL SEU SUPERVISOR?', 'QUEM É VOCÊ?', 'TENDÊNCIA DE QUAL O MÊS VOCÊ ESTÁ RESPONDENDO?',
   'QUAL TENDÊNCIA VOCÊS ESTÁ RESPONDENDO?', 'TENDÊNCIA GERAL (R$)', 'MSD (R$)', 'BRAVECTO (unidades)', 'FUN PADS', 'IDEXX (R$)', 'POSITIVAÇÃO DE CNPJ', 'Origem'];
@@ -43,6 +46,8 @@ function doPost(e) {
     if (req.action === 'email') return enviarEmail_(auth, req);
     if (req.action === 'tendencias_ler') return tendenciasLer_(auth);
     if (req.action === 'tendencia_salvar') return tendenciaSalvar_(auth, req);
+    if (req.action === 'estoque_ler') return estoqueLer_(auth, req);
+    if (req.action === 'estoque_salvar') return estoqueSalvar_(auth, req);
     return json_({ ok: false, erro: 'Ação desconhecida.' });
   } catch (err) {
     return json_({ ok: false, erro: 'Erro no servidor: ' + err.message });
@@ -207,6 +212,54 @@ function num_(v) {
   else if ((s.match(/\./g) || []).length > 1) { const i = s.lastIndexOf('.'); s = s.slice(0, i).replace(/\./g, '') + '.' + s.slice(i + 1); }
   const x = Number(s) * mult;
   return isFinite(x) ? x : null;
+}
+
+/* ------------------------------------------------------------------ estoque nos clientes */
+/** Contagens de um cliente (req.cli = código), só as de RCAs que o usuário pode ver. */
+function estoqueLer_(auth, req) {
+  const cli = parseInt(req.cli, 10), eq = equipe_(), u = auth.user;
+  const aba = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ABA_ESTOQUE);
+  if (!cli || !aba || aba.getLastRow() < 2) return json_({ ok: true, linhas: [] });
+  const linhas = [];
+  aba.getRange(2, 1, aba.getLastRow() - 1, 10).getValues().forEach(function (v) {
+    if (parseInt(v[3], 10) !== cli || !podeVer_(u, parseInt(v[5], 10), eq)) return;
+    const data = v[1] instanceof Date ? Utilities.formatDate(v[1], FUSO, 'yyyy-MM-dd') : String(v[1]);
+    linhas.push({ ts: v[0] instanceof Date ? v[0].getTime() : 0, data: data, id: String(v[2]), p: String(v[6]), f: String(v[7]), q: Number(v[8]) || 0, u: String(v[9]) });
+  });
+  return json_({ ok: true, linhas: linhas });
+}
+
+function estoqueSalvar_(auth, req) {
+  const u = auth.user, eq = equipe_();
+  const cli = parseInt(req.cli, 10), rca = parseInt(req.rca, 10);
+  if (!cli) return json_({ ok: false, erro: 'Cliente inválido.' });
+  if (u.p === 'RCA' && rca !== u.c) return json_({ ok: false, erro: 'Contagem só na sua carteira.' });
+  if (u.p !== 'RCA' && !podeVer_(u, rca, eq)) return json_({ ok: false, erro: 'Cliente fora da sua equipe.' });
+  const data = String(req.data || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || data > Utilities.formatDate(new Date(), FUSO, 'yyyy-MM-dd')) return json_({ ok: false, erro: 'Data da contagem inválida.' });
+  const itens = Array.isArray(req.itens) ? req.itens : [];
+  if (!itens.length || itens.length > 300) return json_({ ok: false, erro: 'Nenhum produto na contagem.' });
+  if (!consumirCota_(auth.hash, 's', LIMITE_CONTAGENS_POR_DIA)) return json_({ ok: false, erro: 'Limite diário de contagens atingido.' });
+  const agora = new Date(), id = Utilities.getUuid().slice(0, 8), nome = String(req.cliNome || '').slice(0, 120);
+  const linhas = [];
+  for (var i = 0; i < itens.length; i++) {
+    const q = Number(itens[i].q);
+    if (!isFinite(q) || q < 0 || q > 1e6) return json_({ ok: false, erro: 'Quantidade inválida em ' + String(itens[i].p).slice(0, 60) + '.' });
+    linhas.push([agora, data, id, cli, nome, rca, String(itens[i].p || '').slice(0, 120), String(itens[i].f || '').slice(0, 40), Math.round(q), u.n]);
+  }
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const planilha = SpreadsheetApp.getActiveSpreadsheet();
+    let aba = planilha.getSheetByName(ABA_ESTOQUE);
+    if (!aba) { aba = planilha.insertSheet(ABA_ESTOQUE); aba.appendRow(CAB_ESTOQUE); aba.setFrozenRows(1); }
+    const ini = aba.getLastRow() + 1;
+    aba.getRange(ini, 1, linhas.length, 10).setValues(linhas);
+    aba.getRange(ini, 1, linhas.length, 1).setNumberFormat('dd/MM/yyyy HH:mm:ss');
+    aba.getRange(ini, 2, linhas.length, 1).setNumberFormat('@');
+  } finally { lock.releaseLock(); }
+  registrar_(u, 'estoque', cli + ' ' + nome.slice(0, 40) + ' | ' + data + ' | ' + linhas.length + ' produtos');
+  return json_({ ok: true, id: id });
 }
 
 /* ------------------------------------------------------------------ apoio */

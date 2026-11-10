@@ -317,17 +317,20 @@
     renderFooter(); renderHist(); setupHomeLab(); renderHome();
     commit();
     showView("hist");
-    NV.trend.init({ p, eng: S.eng, token: TOKEN });
+    const ctx = { p, eng: S.eng, token: TOKEN };
+    const comTend = NV.trend.init(ctx), comEstoque = NV.stock.init(ctx);
+    $("#app-nav").hidden = !(comTend || comEstoque);
     NV.remote.logLogin(TOKEN);
   }
 
-  /* funções do aplicativo (menu de cima): Clientes e Tendências */
+  /* funções do aplicativo (menu de cima): Clientes, Tendências e Estoque */
   function showView(v) {
     document.body.dataset.view = v;
     $$("#app-view > main[data-view]").forEach((m) => { m.hidden = m.dataset.view !== v; });
     $$("#app-nav button").forEach((b) => (b.dataset.view === v ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current")));
     scrollTo(0, 0);
     if (v === "trend") NV.trend.mostrar();
+    if (v === "stock") NV.stock.mostrar();
   }
 
   function renderFooter() {

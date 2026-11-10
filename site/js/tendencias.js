@@ -372,10 +372,10 @@
       T.form = { rca: 0, n: 1 };
       const ativo = !!ctx.p.tendencias && !!NV.remote.endpoint;
       $("#app-nav [data-view=trend]").hidden = !ativo;
-      $("#app-nav").hidden = !ativo;
       $("#alert-bar").hidden = true; $("#trend-dot").hidden = true;
-      if (!ativo) return;
+      if (!ativo) return false;
       carregar(true).then(atualizarAlerta);
+      return true;
     },
     async mostrar() { if (!T.ctx) return; render(); await carregar(false); render(); },
     irParaResponder() { $("#trend-form-card").scrollIntoView({ behavior: "smooth", block: "start" }); },
