@@ -50,6 +50,7 @@
     <symbol id="i-star" viewBox="0 0 24 24"><polygon fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></symbol>
     <symbol id="i-users" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></g></symbol>
     <symbol id="i-box" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></g></symbol>
+    <symbol id="i-cart" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></g></symbol>
     <symbol id="i-bell" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></g></symbol>
     <symbol id="i-whatsapp" viewBox="0 0 24 24"><path fill="currentColor" d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.76.46 3.45 1.32 4.94L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2zm5.83 14.05c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.11.11-1.79-.11-.41-.13-.94-.3-1.62-.58-2.85-1.23-4.71-4.1-4.85-4.29-.14-.19-1.16-1.54-1.16-2.94s.72-2.09 1-2.38c.24-.25.53-.31.71-.31.18 0 .35 0 .5.01.16.01.38-.06.6.46.24.58.81 2 .88 2.15.07.15.11.32.02.51-.09.19-.14.31-.28.48-.14.16-.29.36-.42.48-.14.13-.28.27-.12.53.16.27.71 1.17 1.52 1.9 1.05.93 1.93 1.22 2.2 1.36.27.14.43.11.59-.07.16-.18.68-.79.86-1.06.18-.27.36-.23.6-.14.24.09 1.55.73 1.82.86.27.13.44.19.51.3.07.11.07.61-.17 1.29z"/></symbol>
     <symbol id="i-logout" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></g></symbol>
@@ -117,6 +118,7 @@
     <button type="button" data-view="home" aria-current="page"><svg><use href="#i-home"/></svg><span>Início</span></button>
     <button type="button" data-view="mes" hidden><svg><use href="#i-target"/></svg><span>Meu mês</span></button>
     <button type="button" data-view="hist"><svg><use href="#i-users"/></svg><span>Clientes</span></button>
+    <button type="button" data-view="miss"><svg><use href="#i-cart"/></svg><span>Não compraram</span></button>
     <button type="button" data-view="oport"><svg><use href="#i-trend"/></svg><span>Oportunidades</span></button>
     <button type="button" data-view="prod"><svg><use href="#i-search"/></svg><span>Produtos</span></button>
     <button type="button" data-view="visao"><svg><use href="#i-file"/></svg><span>Visão do cliente</span></button>
@@ -139,6 +141,8 @@
           <b>Meu mês</b><small>Meta x vendido, ritmo do mês, quanto vender por dia útil e ranking da equipe.</small></button>
         <button type="button" class="hub-tile" data-go-view="hist"><span class="hub-ic"><svg><use href="#i-users"/></svg></span>
           <b>Clientes</b><small>Painel do mês, histórico de compras, rankings e PDF do cliente.</small></button>
+        <button type="button" class="hub-tile" data-go-view="miss"><span class="hub-ic"><svg><use href="#i-cart"/></svg></span>
+          <b>Ainda não compraram</b><small>Clientes que compraram no ano, mas ainda não neste mês, do maior para o menor.</small></button>
         <button type="button" class="hub-tile" data-go-view="oport"><span class="hub-ic"><svg><use href="#i-trend"/></svg></span>
           <b>Oportunidades</b><small>Famílias que caíram ou cresceram no ano e os clientes com as maiores quedas.</small></button>
         <button type="button" class="hub-tile" data-go-view="prod"><span class="hub-ic"><svg><use href="#i-search"/></svg></span>
@@ -181,6 +185,20 @@
     <section id="stock-hist" class="card" hidden></section>
   </main>
 
+  <main class="content" id="view-miss" data-view="miss" hidden>    <section id="miss-card" class="card" aria-labelledby="miss-title">
+      <div class="card-head">
+        <div><h2 id="miss-title"></h2><p id="miss-sub"></p></div>
+        <div class="head-tools" id="miss-tools">
+          <div class="seg" id="miss-sort" role="group" aria-label="Ordem da lista">
+            <button type="button" data-s="desc" aria-pressed="true">Maiores primeiro</button>
+            <button type="button" data-s="asc" aria-pressed="false">Menores primeiro</button>
+          </div>
+        </div>
+      </div>
+      <div id="miss-list"></div>
+      <div class="miss-foot"><button id="miss-more" class="btn btn-ghost btn-sm" type="button" hidden></button></div>
+    </section>
+  </main>
   <main class="content" id="view-mes" data-view="mes" hidden><section id="mes-card" class="card"></section></main>
   <main class="content" id="view-oport" data-view="oport" hidden><section id="oport-card" class="card"></section></main>
   <main class="content" id="view-prod" data-view="prod" hidden><section id="prod-card" class="card"></section></main>
@@ -226,19 +244,6 @@
       </div>
     </section>
 
-    <section id="miss-card" class="card" aria-labelledby="miss-title">
-      <div class="card-head">
-        <div><h2 id="miss-title"></h2><p id="miss-sub"></p></div>
-        <div class="head-tools">
-          <div class="seg" id="miss-sort" role="group" aria-label="Ordem da lista">
-            <button type="button" data-s="desc" aria-pressed="true">Maiores primeiro</button>
-            <button type="button" data-s="asc" aria-pressed="false">Menores primeiro</button>
-          </div>
-        </div>
-      </div>
-      <div id="miss-list"></div>
-      <div class="miss-foot"><button id="miss-more" class="btn btn-ghost btn-sm" type="button" hidden></button></div>
-    </section>
 
     <!-- filtros -->
     <section id="filters" class="card filters" aria-label="Filtros">

@@ -336,6 +336,10 @@
     $$("#app-view > main[data-view]").forEach((m) => { m.hidden = m.dataset.view !== v; });
     $$("#app-nav button").forEach((b) => (b.dataset.view === v ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current")));
     scrollTo(0, 0);
+    /* os seletores supervisor/RCA/laboratório do painel acompanham a tela "Ainda não compraram" */
+    const sels = ["#home-sup-wrap", "#home-rca-wrap", "#home-lab-wrap"].map((q) => $(q));
+    if (v === "miss") $("#miss-tools").prepend(...sels);
+    else if (v === "hist") $("#home-items-btn").before(...sels);
     if (v === "trend") NV.trend.mostrar();
     if (v === "stock") NV.stock.mostrar();
     if (v === "aval") NV.aval.mostrar();
@@ -568,7 +572,7 @@
     const box = $("#miss-list");
     if (!list.length) { box.replaceChildren(h("div", { class: "empty" }, "Todos os clientes CNPJ que compraram" + (lab ? " " + lab : "") + (rec ? " (" + rec + ")" : "") + " em " + year + " já compraram em " + fmt.ymFull(last) + ".")); }
     else {
-      const open = (id) => { S.f.clientes = new Set([id]); S.f.principais = new Set(); commit(); $("#detail-card").scrollIntoView({ behavior: "smooth" }); };
+      const open = (id) => NV.abrirCliente(id);
       const rows = (m.full ? list : list.slice(0, MISS_TOP)).map((x) =>
         h("tr", { class: "row", onclick: () => open(x.id) }, h("td", { class: "wrap" }, p.cli[x.id].n), h("td", { class: "num nowrap" }, fmt.plain(fmt.brl(x.total)))));
       box.replaceChildren(h("div", { class: "table-wrap" + (m.full ? " miss-scroll" : "") }, h("table", { class: "tbl" },

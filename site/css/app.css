@@ -440,7 +440,7 @@ code, .code { font: 12px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; 
 .alert-bar span { flex: 1; min-width: 0; }
 @keyframes bell { 0%, 70%, 100% { transform: rotate(0); } 75% { transform: rotate(14deg); } 80% { transform: rotate(-12deg); } 85% { transform: rotate(8deg); } 90% { transform: rotate(-6deg); } }
 @media (min-width: 1449px) { .alert-bar { margin-left: auto; margin-right: auto; } }
-body[data-view="trend"] .bottombar, body[data-view="stock"] .bottombar, body[data-view="aval"] .bottombar, body[data-view="val"] .bottombar, body[data-view="mes"] .bottombar, body[data-view="oport"] .bottombar, body[data-view="prod"] .bottombar, body[data-view="visao"] .bottombar, body[data-view="conq"] .bottombar { display: none !important; }
+body[data-view="trend"] .bottombar, body[data-view="stock"] .bottombar, body[data-view="aval"] .bottombar, body[data-view="val"] .bottombar, body[data-view="mes"] .bottombar, body[data-view="oport"] .bottombar, body[data-view="prod"] .bottombar, body[data-view="visao"] .bottombar, body[data-view="conq"] .bottombar, body[data-view="miss"] .bottombar { display: none !important; }
 .trend-status { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 8px 18px 18px; }
 .tstat { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2, var(--zebra)); }
 .tstat.on { border-color: var(--primary); }
