@@ -407,6 +407,57 @@ def obter_diario(cfg, token_path, sup_por_nome, verificar_remetente=True):
     return dia, origem
 
 
+def ler_validades(caminho):
+    """Planilha diária de validades (Fornecedor x Produto x Data Validade x Estoque WMS): lotes com saldo e ainda válidos."""
+    bruto = pd.read_excel(caminho, sheet_name=0)
+    col = {}
+    for c in bruto.columns:
+        k = sem_acento(c).upper()
+        if k.startswith("FORNECEDOR"):
+            col["forn"] = c
+        elif k.startswith("PRODUTO"):
+            col["prod"] = c
+        elif "VALIDADE" in k:
+            col["val"] = c
+        elif "ESTOQUE" in k or "QUANTIDADE" in k:
+            col["qtd"] = c
+    faltam = [x for x in ("forn", "prod", "val", "qtd") if x not in col]
+    if faltam:
+        sys.exit("ERRO: a planilha de validades não tem as colunas esperadas: " + ", ".join(faltam))
+    df = pd.DataFrame({k: bruto[v] for k, v in col.items()})
+    df["dt"] = pd.to_datetime(df["val"].astype(str), format="%d/%m/%Y", errors="coerce")
+    df["qtd"] = pd.to_numeric(df["qtd"], errors="coerce").fillna(0).round().astype("int64")
+    hoje = pd.Timestamp(agora().date())
+    df = df[df["dt"].notna() & (df["qtd"] > 0) & (df["dt"] >= hoje)].copy()
+    df["forn"] = df["forn"].map(normalizar_fornecedor)
+    df["prod"] = df["prod"].astype(str).str.strip()
+    df["ymd"] = df["dt"].dt.year * 10000 + df["dt"].dt.month * 100 + df["dt"].dt.day
+    itens = []
+    for (prod, forn), g in df.groupby(["prod", "forn"]):
+        g = g.groupby("ymd", as_index=False)["qtd"].sum().sort_values("ymd")
+        itens.append({"p": prod, "f": forn, "l": [[int(a), int(b)] for a, b in zip(g.ymd, g.qtd)]})
+    return sorted(itens, key=lambda x: (x["l"][0][0], x["p"]))
+
+
+def obter_validades(cfg, token_path, verificar_remetente=True):
+    """Opcional (bloco 'gmail_validades'): sem o e-mail, a tela de validades não aparece."""
+    if not cfg.get("gmail_validades"):
+        return None
+    caminho = None
+    try:
+        caminho, origem = baixar_do_gmail(cfg, token_path, verificar_remetente, bloco="gmail_validades")
+        itens = ler_validades(caminho)
+    except SystemExit as e:
+        print(f"::warning::Planilha de validades indisponível ({e}).")
+        return None
+    finally:
+        if caminho is not None:
+            Path(caminho).unlink(missing_ok=True)
+    data = re.search(r"(\d{2}/\d{2}/\d{4})", origem)
+    print(f"  Validades: {len(itens)} produtos com estoque válido")
+    return {"data": data.group(1) if data else "", "itens": itens}
+
+
 def normalizar_fornecedor(bruto):
     s = re.sub(r"^\s*\d+\s*-\s*", "", str(bruto)).replace("*", "").strip().upper()
     if "PRIMORE" in s:
@@ -477,7 +528,7 @@ def recorte_do_usuario(d, u):
     return d[d.rca_cod == u.codigo]
 
 
-def montar_payload(d, u, meta, registro, usuarios, dia=None):
+def montar_payload(d, u, meta, registro, usuarios, dia=None, validades=None):
     sub = recorte_do_usuario(d, u)
     sup_cods = sorted(sub.sup_cod.unique().tolist())
     sup_idx = {c: i for i, c in enumerate(sup_cods)}
@@ -529,6 +580,8 @@ def montar_payload(d, u, meta, registro, usuarios, dia=None):
                           "d": sd.ymd.astype(int).tolist(), "r": sd.rca_cod.map({c: i for i, c in enumerate(rcods)}).astype(int).tolist(),
                           "k": sd.forn.map({n: i for i, n in enumerate(fnomes)}).astype(int).tolist(),
                           "liq": sd.liq.astype(int).tolist(), "venda": sd.venda.astype(int).tolist()}
+    if validades:
+        payload["validades"] = validades
     if TENDENCIAS.get("datas"):
         # datas da 1ª/2ª tendência (da agenda) e link do Forms: dentro do payload cifrado, não no site público
         payload["tendencias"] = {"datas": TENDENCIAS["datas"], "formUrl": TENDENCIAS.get("form_url", "")}
@@ -564,7 +617,7 @@ def cifrar(payload, token, u):
     return {"v": 1, "it": PBKDF2_ITER, "salt": b64(salt), "iv": b64(iv), "ct": b64(ct)}, len(bruto)
 
 
-def escrever_dados(d, usuarios, registro, meta, silencioso=False, dia=None):
+def escrever_dados(d, usuarios, registro, meta, silencioso=False, dia=None, validades=None):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     for antigo in DATA_DIR.glob("*.js"):
         antigo.unlink()                                  # tokens renovados/revogados somem do site
@@ -573,7 +626,7 @@ def escrever_dados(d, usuarios, registro, meta, silencioso=False, dia=None):
         reg = registro["usuarios"][u.uid]
         if reg["status"] != "ativo":
             continue
-        payload = montar_payload(d, u, meta, registro, usuarios, dia)
+        payload = montar_payload(d, u, meta, registro, usuarios, dia, validades)
         blob, bruto = cifrar(payload, reg["token"], u)
         arq = DATA_DIR / f"{fid_do_token(reg['token'])}.js"
         arq.write_text("window.__nv_blob=" + json.dumps(blob, separators=(",", ":")) + ";", encoding="utf-8")
@@ -889,12 +942,13 @@ def main():
     if args.gmail:                                        # planilha diária: comparação por dias corridos reais
         dia, _ = obter_diario(cfg, args.token_path, mapa_supervisores(bruto_df),
                               verificar_remetente=not args.sem_verificar_remetente)
+    validades = obter_validades(cfg, args.token_path, verificar_remetente=not args.sem_verificar_remetente) if args.gmail else None
     meta = {"geradoEm": agora().isoformat(timespec="seconds"), "fonte": meta_fonte}
     print("Gerando dados criptografados por usuário ...")
     preparar_assets()
     if args.ci:
         versionar_assets()
-    escrever_dados(d, usuarios, registro, meta, silencioso=args.ci, dia=dia)
+    escrever_dados(d, usuarios, registro, meta, silencioso=args.ci, dia=dia, validades=validades)
     n = gerar_lista_apps_script(usuarios, registro)
     print(f"apps_script/usuarios_autorizados.json: {n} usuário(s) autorizado(s) a enviar e-mail.")
 
