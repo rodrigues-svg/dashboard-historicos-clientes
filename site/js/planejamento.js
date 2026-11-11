@@ -153,6 +153,11 @@
       Object.assign(P, { ctx, aba: "acoes", filtro: "todas", quem: "", aberta: -1 });
       const ativo = !!(ctx.p.planejamento && ctx.p.planejamento.acoes);
       $("#app-nav [data-view=plan]").hidden = !ativo;
+      if (ativo) {                                                   // "Planejamento 2027" no botão e no início
+        const rot = "Planejamento " + ctx.p.planejamento.ano;
+        $("#app-nav [data-view=plan] span").textContent = rot;
+        $(".hub-tile[data-go-view=plan] b").textContent = rot;
+      }
       if (ativo) atualizarAlerta(); else { $("#plan-alert").hidden = true; }
       return ativo;
     },

@@ -660,3 +660,16 @@ td.neg { color: var(--bad); font-weight: 600; }
   .plan-top { flex-direction: column; gap: 8px; }
 }
 body[data-view="plan"] #plan-alert { display: none; }
+/* tablet: os botões de função quebram linha em vez de ficarem escondidos à direita */
+@media (min-width: 768px) and (max-width: 1099px) { .app-nav { flex-wrap: wrap; overflow: visible; } }
+/* PC: coluna fixa de botões na lateral direita */
+@media (min-width: 1100px) {
+  #app-view:has(#app-nav:not([hidden])) { padding-right: 236px; }
+  .app-nav { position: fixed; top: 0; right: 0; bottom: 0; z-index: 25; width: 236px; max-width: none; margin: 0;
+    padding: 16px 14px 20px; flex-direction: column; gap: 6px; overflow-y: auto;
+    background: var(--surface); border-left: 1px solid var(--line); }
+  .app-nav button { flex: none; width: 100%; justify-content: flex-start; border-radius: 10px; border-color: transparent; background: transparent; }
+  .app-nav button:hover { background: var(--zebra); }
+  .app-nav button[aria-current="page"] { background: var(--primary); border-color: var(--primary); }
+  .app-nav .dot { top: calc(50% - 6.5px); right: 12px; }
+}
