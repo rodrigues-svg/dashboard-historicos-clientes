@@ -77,6 +77,7 @@ COLUNAS_OBRIGATORIAS = [
 # Não fica no código (o repositório é público): é montada a partir do usuarios.csv,
 # que no CI vem do secret USUARIOS_CSV.
 # --------------------------------------------------------------------------
+PLANEJAMENTO = {}      # bloco "planejamento" do config (5W2H anual; gerado por atualizar_planejamento.py)
 AVALIACAO = {}         # bloco "avaliacao" do config (vendedores a ignorar nos resultados)
 TENDENCIAS = {}        # bloco "tendencias" do config (datas da 1ª/2ª tendência, link do Forms, rótulos do Forms)
 SUPERVISORES = {}      # codigo -> nome
@@ -637,6 +638,8 @@ def montar_payload(d, u, meta, registro, usuarios, dia=None, validades=None, met
         payload["tendencias"] = {"datas": TENDENCIAS["datas"], "formUrl": TENDENCIAS.get("form_url", "")}
     if AVALIACAO.get("excluir") and u.tipo != "RCA":
         payload["avaliacao"] = {"excluir": AVALIACAO["excluir"], "apelidos": AVALIACAO.get("apelidos", {})}
+    if PLANEJAMENTO.get("acoes") and u.tipo in ("Gerente", "Supervisor"):
+        payload["planejamento"] = planejamento_do_usuario(u)
     if u.tipo == "Gerente":
         payload["admin"] = {"usuarios": [{
             "nome": x.nome, "tipo": x.tipo, "email": x.login, "pendente": x.pendente,
@@ -644,6 +647,19 @@ def montar_payload(d, u, meta, registro, usuarios, dia=None, validades=None, met
             "renovado": registro["usuarios"][x.uid]["renovado"],
             "tokenId": token_id(registro["usuarios"][x.uid]["token"])} for x in usuarios]}
     return payload
+
+
+def planejamento_do_usuario(u):
+    """Gerente vê o plano inteiro; cada supervisor vê as ações dos "Supervisores", as que citam o primeiro nome dele
+    e as sem responsável (as da "Gerência" ou de outro supervisor ficam de fora). Agenda, campanhas e SWOT: todos."""
+    plano = dict(PLANEJAMENTO)
+    if u.tipo != "Gerente":
+        nome = unicodedata.normalize("NFKD", u.nome.split()[0]).encode("ascii", "ignore").decode().lower()
+        def minha(a):
+            q = unicodedata.normalize("NFKD", a.get("quem", "")).encode("ascii", "ignore").decode().lower()
+            return not q or "supervisor" in q or nome in re.findall(r"[a-z]+", q)
+        plano["acoes"] = [a for a in PLANEJAMENTO["acoes"] if minha(a)]
+    return plano
 
 
 def status_de(u, registro):
@@ -912,6 +928,7 @@ def main():
         cfg.update(json.loads(CONFIG_LOCAL.read_text(encoding="utf-8")))
     TENDENCIAS.update(cfg.get("tendencias") or {})
     AVALIACAO.update(cfg.get("avaliacao") or {})
+    PLANEJAMENTO.update(cfg.get("planejamento") or {})
     ap = argparse.ArgumentParser(description="Gerador do Dashboard Consulta Históricos de Clientes")
     ap.add_argument("--excel", help="caminho da planilha analítica (padrão: config.json)")
     ap.add_argument("--gmail", action="store_true", help="baixa a planilha do e-mail (usa token.json)")

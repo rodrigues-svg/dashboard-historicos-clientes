@@ -123,7 +123,7 @@
     NV.charts.destroy();
     closeAll();
     S.p = S.eng = S.user = S.mk = S.mkPrev = null; S.hist = [];
-    $("#alert-bar").hidden = true;
+    $("#alert-bar").hidden = true; NV.plan.sair();
     $("#app-view").hidden = true;
     $("#login-view").hidden = false;
     $("#login-pin").value = "";
@@ -318,7 +318,7 @@
     commit();
     const ctx = { p, eng: S.eng, token: TOKEN };
     const comTend = NV.trend.init(ctx), comEstoque = NV.stock.init(ctx), comAval = NV.aval.init(ctx), comVal = NV.val.init(ctx);
-    NV.painel.init(ctx); NV.extras.init(ctx);
+    NV.painel.init(ctx); NV.extras.init(ctx); NV.plan.init(ctx);
     $("#app-nav").hidden = false;
     /* tela inicial: um botão para cada função disponível (sem funções extras, abre direto em Clientes) */
     $("#hub-title").textContent = "Olá, " + u.nome.split(" ")[0] + "!";
@@ -346,6 +346,7 @@
     if (v === "val") NV.val.mostrar();
     if (v === "mes" || v === "oport" || v === "prod") NV.painel.mostrar(v);
     if (v === "visao" || v === "conq") NV.extras.mostrar(v);
+    if (v === "plan") NV.plan.mostrar();
   }
 
   function renderFooter() {
@@ -671,6 +672,7 @@
     $$("#app-nav button").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
     $$(".hub-tile").forEach((t) => t.addEventListener("click", () => showView(t.dataset.goView)));
     $(".topbar .logo-chip").addEventListener("click", (ev) => { if (!$("#app-nav").hidden) { ev.preventDefault(); showView("home"); } });
+    $("#plan-alert-go").addEventListener("click", () => showView("plan"));
     $("#alert-go").addEventListener("click", () => { showView("trend"); setTimeout(() => NV.trend.irParaResponder(), 80); });
     $("#trend-share").addEventListener("click", () => NV.trend.abrirImagem());
     $("#trend-img-share").addEventListener("click", () => NV.trend.compartilhar());
