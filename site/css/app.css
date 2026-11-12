@@ -673,3 +673,4 @@ body[data-view="plan"] #plan-alert { display: none; }
   .app-nav button[aria-current="page"] { background: var(--primary); border-color: var(--primary); }
   .app-nav .dot { top: calc(50% - 6.5px); right: 12px; }
 }
+.tbl tr.tot td { background: var(--zebra); border-top: 2px solid var(--line-2); }

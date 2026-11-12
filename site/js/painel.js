@@ -60,6 +60,57 @@
     return { total, passados };
   }
 
+  /* ---------------------------------------------------------------- metas do ano (planilha oficial; só gerente e supervisores) */
+  function blocoAno() {
+    const { p, eng: e } = C, ma = p.metasAno;
+    if (!ma || p.user.tipo === "RCA") return null;
+    const ano = ma.ano, lab = F.lab >= 0 ? p.forn[F.lab] : "", total = F.sup < 0 && F.rca < 0 && ma.labs;
+    const rcas = rcasFiltro(), alvo = F.rca >= 0 ? rcas.filter((r) => r.i === F.rca) : rcas;
+    const soma = (a, b) => a.map((v, k) => v + (b[k] || 0));
+    let meta = Array(12).fill(0), metaP = Array(12).fill(0), tem = false;
+    if (total) {
+      const ls = Object.entries(ma.labs).filter(([n]) => !lab || n === lab);
+      ls.forEach(([, v]) => { meta = soma(meta, v); tem = true; });
+      if (!lab) Object.values(ma.rca).forEach((m) => { metaP = soma(metaP, m.p); });
+    } else if (!lab) {
+      alvo.forEach((r) => { const m = ma.rca[String(r.c)]; if (m) { meta = soma(meta, m.m); metaP = soma(metaP, m.p); tem = true; } });
+    }
+    const titulo = h("h3", { class: "aval-h3" }, `Metas ${ano} mês a mês` + (lab ? " · " + lab : ""));
+    if (!tem) return [titulo, h("p", { class: "note" }, lab ? "A meta por laboratório existe só no total da gerência. Tire o filtro de supervisor/RCA ou o de laboratório." : "Sem meta anual para esse filtro.")];
+    const ok = new Uint8Array(e.nRca); (total ? rcas : alvo).forEach((r) => (ok[r.i] = 1));
+    if (total) ok.fill(1);
+    const y0 = ano * 12, liq = new Float64Array(24), cli = new Map();
+    for (let i = 0; i < e.n; i++) {
+      const y = e.ym[i], k = y - (y0 - 12);
+      if (k < 0 || k > 23 || !ok[e.rca[i]]) continue;
+      if (lab && p.forn[e.prodForn[e.prod[i]]] !== lab) continue;
+      liq[k] += e.liq[i];
+      if (k >= 12) { const kc = (k * e.nRca + e.rca[i]) * e.nCli + e.cli[i]; cli.set(kc, (cli.get(kc) || 0) + e.liq[i]); }
+    }
+    const posM = new Array(12).fill(0);
+    cli.forEach((v, kc) => { if (v > 0.005) posM[Math.floor(kc / e.nCli / e.nRca) - 12]++; });
+    const cheio = (y) => y < e.ymMax, visto = (y) => y <= e.ymMax;
+    const linhas = [], tot = { m: 0, b: 0, mb: 0, r: 0, mp: 0, pr: 0 };
+    for (let m = 0; m < 12; m++) {
+      const yb = y0 - 12 + m, yr = y0 + m, base = cheio(yb) ? liq[m] : null, real = visto(yr) ? liq[12 + m] : null;
+      tot.m += meta[m]; if (base != null) { tot.b += base; tot.mb += meta[m]; } if (real != null) { tot.r += real; tot.pr += posM[m]; } tot.mp += metaP[m];
+      const pc = real != null && meta[m] ? (real / meta[m]) * 100 : null;
+      linhas.push(h("tr", {}, h("td", {}, NV.MESES_ABR[m] + (yr === e.ymMax ? " *" : "")), h("td", { class: "num" }, money(meta[m])),
+        h("td", { class: "num" }, base != null ? money(base) : "—"),
+        h("td", { class: "num" }, base ? fmt.pct((meta[m] / base - 1) * 100) : "—"),
+        h("td", { class: "num" }, real != null ? money(real) : "—"),
+        h("td", { class: "num" }, pc != null ? h("div", { class: "tbar " + (pc >= 100 ? "ok" : "neu") }, h("span", {}, fmt.pct(pc)), h("i", { style: `width:${Math.min(100, pc)}%` })) : "—"),
+        lab ? null : h("td", { class: "num" }, fmt.int(metaP[m])), lab ? null : h("td", { class: "num" }, real != null ? fmt.int(posM[m]) : "—")));
+    }
+    linhas.push(h("tr", { class: "tot" }, h("td", {}, h("b", {}, "Ano")), h("td", { class: "num" }, h("b", {}, money(tot.m))), h("td", { class: "num" }, money(tot.b)),
+      h("td", { class: "num" }, tot.b ? fmt.pct((tot.mb / tot.b - 1) * 100) : "—"), h("td", { class: "num" }, tot.r ? money(tot.r) : "—"),
+      h("td", { class: "num" }, tot.r && tot.m ? fmt.pct((tot.r / tot.m) * 100) : "—"), lab ? null : h("td", { class: "num" }, fmt.int(tot.mp)), lab ? null : h("td", { class: "num" }, tot.r ? fmt.int(tot.pr) : "—")));
+    const cab = ["Mês", `Meta ${ano}`, `Realizado ${ano - 1}`, "Crescimento pedido", `Realizado ${ano}`, "Atingido"].concat(lab ? [] : ["Meta positivação", "Positivados"]);
+    const quem = total ? "total da gerência (metas por laboratório)" : F.rca >= 0 ? "RCA selecionado" : F.sup >= 0 ? "equipe de " + p.sup[F.sup].n : "sua equipe";
+    return [titulo, h("p", { class: "note" }, `Meta oficial ${ano} (${quem}): ${money(tot.m)} no ano. Crescimento do ano compara só os meses que já têm realizado do ano anterior. Realizado = faturamento líquido; positivados = clientes com compra no mês somados por RCA. * mês em andamento.`),
+      h("div", { class: "table-wrap" }, h("table", { class: "tbl" }, h("thead", {}, h("tr", {}, cab.map((t, i) => h("th", { class: i ? "num" : "", style: "cursor:default" }, t)))), h("tbody", {}, linhas)))];
+  }
+
   /* ================================================================ Meu mês */
   function renderMes() {
     const { p, eng: e } = C, box = $("#mes-card"), metas = p.metas || { rca: {} }, u = p.user;
@@ -98,7 +149,7 @@
       return { r, v: porRca[r.i], meta: metaDe(r.m), pc: metaDe(r.m) ? (porRca[r.i] / metaDe(r.m)) * 100 : 0, pos: pr };
     }).sort((a, b) => b.pc - a.pc) : [];
 
-    if (!rcas.length) { box.replaceChildren(h("div", { class: "card-head" }, h("div", {}, h("h2", {}, "Meu mês"), h("p", {}, "As metas do mês ainda não chegaram para esse filtro."))), barraFiltros(renderMes)); return; }
+    if (!rcas.length) { box.replaceChildren(h("div", { class: "card-head" }, h("div", {}, h("h2", {}, "Meu mês"), h("p", {}, "As metas do mês ainda não chegaram para esse filtro.")), barraFiltros(renderMes)), h("div", { class: "card-body" }, blocoAno())); return; }
     box.replaceChildren(
       h("div", { class: "card-head" }, h("div", {}, h("h2", {}, `${NV.MESES[mo]} de ${ano}` + (lab ? " · " + lab : "")),
         h("p", {}, `Dados até ${String(ate).padStart(2, "0")}/${String(mo + 1).padStart(2, "0")} · ${du.passados} de ${du.total} dias úteis · faltam ${restam}`)), h("div", { class: "head-tools" }, sel)),
@@ -123,6 +174,7 @@
             h("tbody", {}, ranking.map((x, k) => h("tr", {}, h("td", {}, k + 1), h("td", { class: "wrap" }, x.r.n), h("td", { class: "num" }, money(x.v)), h("td", { class: "num" }, money(x.meta)),
               h("td", { class: "num" }, h("div", { class: "tbar " + (x.pc >= ritmo ? "ok" : "neu") }, h("span", {}, fmt.pct(x.pc)), h("i", { style: `width:${Math.min(100, x.pc)}%` }))),
               h("td", { class: "num" }, lab ? fmt.int(x.pos) : `${fmt.int(x.pos)} / ${fmt.int(x.r.m.p)}`))))))] : null,
+        blocoAno(),
         h("p", { class: "note" }, "Vendido = venda imputada no mês (base de vendas). Ritmo esperado = dias úteis passados ÷ dias úteis do mês. Metas: relatórios diários de metas por RCA, por laboratório e de positivação.")));
   }
 
@@ -194,7 +246,7 @@
   NV.painel = {
     init(ctx) {
       C = ctx; F.sup = -1; F.rca = -1; F.lab = -1; O.fam = ""; P.q = "";
-      const temMeta = !!(ctx.p.metas && Object.keys(ctx.p.metas.rca || {}).length);
+      const temMeta = !!(ctx.p.metas && Object.keys(ctx.p.metas.rca || {}).length) || !!(ctx.p.metasAno && ctx.p.user.tipo !== "RCA");
       $("#app-nav [data-view=mes]").hidden = !temMeta;
       return true;
     },

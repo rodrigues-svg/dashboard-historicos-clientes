@@ -77,6 +77,7 @@ COLUNAS_OBRIGATORIAS = [
 # Não fica no código (o repositório é público): é montada a partir do usuarios.csv,
 # que no CI vem do secret USUARIOS_CSV.
 # --------------------------------------------------------------------------
+METAS_ANO = {}         # bloco "metas_ano" do config (metas anuais por RCA/laboratório; atualizar_metas_ano.py)
 PLANEJAMENTO = {}      # bloco "planejamento" do config (5W2H anual; gerado por atualizar_planejamento.py)
 AVALIACAO = {}         # bloco "avaliacao" do config (vendedores a ignorar nos resultados)
 TENDENCIAS = {}        # bloco "tendencias" do config (datas da 1ª/2ª tendência, link do Forms, rótulos do Forms)
@@ -638,6 +639,14 @@ def montar_payload(d, u, meta, registro, usuarios, dia=None, validades=None, met
         payload["tendencias"] = {"datas": TENDENCIAS["datas"], "formUrl": TENDENCIAS.get("form_url", "")}
     if AVALIACAO.get("excluir") and u.tipo != "RCA":
         payload["avaliacao"] = {"excluir": AVALIACAO["excluir"], "apelidos": AVALIACAO.get("apelidos", {})}
+    if METAS_ANO.get("rca") and u.tipo in ("Gerente", "Supervisor"):
+        # metas do ano (planilha oficial): só gerente e supervisores; supervisor recebe só os RCAs da equipe
+        cods = {str(c) for c in sub.rca_cod.unique().tolist()}
+        ma = {"ano": METAS_ANO["ano"], "lido": METAS_ANO.get("lido", ""),
+              "rca": {c: {"m": v["m"], "p": v["p"]} for c, v in METAS_ANO["rca"].items() if u.tipo == "Gerente" or c in cods}}
+        if u.tipo == "Gerente":
+            ma["labs"] = {normalizar_fornecedor(k): v for k, v in METAS_ANO.get("labs", {}).items()}
+        payload["metasAno"] = ma
     if PLANEJAMENTO.get("acoes") and u.tipo in ("Gerente", "Supervisor"):
         payload["planejamento"] = planejamento_do_usuario(u)
     if u.tipo == "Gerente":
@@ -929,6 +938,7 @@ def main():
     TENDENCIAS.update(cfg.get("tendencias") or {})
     AVALIACAO.update(cfg.get("avaliacao") or {})
     PLANEJAMENTO.update(cfg.get("planejamento") or {})
+    METAS_ANO.update(cfg.get("metas_ano") or {})
     ap = argparse.ArgumentParser(description="Gerador do Dashboard Consulta Históricos de Clientes")
     ap.add_argument("--excel", help="caminho da planilha analítica (padrão: config.json)")
     ap.add_argument("--gmail", action="store_true", help="baixa a planilha do e-mail (usa token.json)")
