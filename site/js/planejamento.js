@@ -132,6 +132,77 @@
       box("oportunidades", "Oportunidades", "sw-o"), box("ameacas", "Ameaças", "sw-t"))];
   }
 
+  /* ---------------------------------------------------------------- PDF (plano completo que o usuário vê) */
+  function baixarPdf() {
+    if (!window.jspdf) { NV.toast("O gerador de PDF ainda está carregando. Tente de novo.", "err"); return; }
+    const pl = P.ctx.p.planejamento, u = P.ctx.p.user, T = (x) => NV.fmt.plain(String(x || ""));
+    const { jsPDF } = window.jspdf, doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const W = 297, M = 12, esc = [38, 70, 83], ver = [42, 157, 143], ama = [233, 196, 106];
+    const hojeTxt = new Date().toLocaleDateString("pt-BR");
+    /* cabeçalho */
+    doc.setFillColor(...esc); doc.rect(0, 0, W, 32, "F");
+    doc.setFillColor(255, 255, 255); doc.roundedRect(M, 5, 52, 22, 3, 3, "F");
+    if (window.NV_LOGO) { const lw = 46, lh = lw / (window.NV_LOGO_RATIO || 3.14); doc.addImage(window.NV_LOGO, "PNG", M + 3, 5 + (22 - lh) / 2, lw, lh); }
+    doc.setTextColor(255); doc.setFont("helvetica", "bold"); doc.setFontSize(18);
+    doc.text("Planejamento " + pl.ano, M + 60, 14);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+    doc.text(T(`Plano de ação 5W2H · ${u.tipo === "Gerente" ? "plano completo da gerência" : "ações da equipe e dos supervisores"}`), M + 60, 20);
+    doc.text(T(`Emitido por ${u.nome} em ${hojeTxt} pelo Radar Novavet${pl.lido ? " · planilha lida em " + dd(dt(pl.lido)) + "/" + pl.lido.slice(0, 4) : ""}`), M + 60, 25);
+    const titulo = (txt, y) => { doc.setTextColor(...esc); doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text(T(txt), M, y); doc.setDrawColor(...ama); doc.setLineWidth(0.8); doc.line(M, y + 1.8, W - M, y + 1.8); return y + 6; };
+    const base = { theme: "grid", margin: { left: M, right: M, top: 14, bottom: 14 }, showHead: "everyPage",
+      styles: { font: "helvetica", fontSize: 7.6, cellPadding: 1.8, textColor: [40, 40, 40], lineColor: [210, 222, 225], lineWidth: 0.2, overflow: "linebreak", valign: "top" },
+      headStyles: { fillColor: esc, textColor: 255, fontStyle: "bold" }, alternateRowStyles: { fillColor: [245, 249, 248] } };
+    /* ações */
+    let y = titulo("Ações 5W2H", 42);
+    doc.autoTable({ ...base, startY: y,
+      head: [["Nº", "O quê / objetivo", "Por quê", "Como", "Quem / onde", "Quando / situação", "Quanto custa", "Status / comentário"]],
+      body: pl.acoes.map((a, i) => {
+        const s = situacao(a), ini = dt(a.ini), fim = dt(a.fim);
+        return [String(i + 1), { content: T(a.que + (a.obj ? "\n" + a.obj : "")), styles: { fontStyle: "normal" } }, T(a.porque), T(a.como),
+          T([a.quem || "a definir", a.reg, a.onde].filter(Boolean).join("\n")),
+          T((ini && fim ? `${dd(ini)}/${ini.getFullYear()} a ${dd(fim)}/${fim.getFullYear()}\n` : "") + s.rot), T(a.custo), T([a.status, a.coment].filter(Boolean).join("\n"))];
+      }),
+      columnStyles: { 0: { cellWidth: 8, halign: "center" }, 1: { cellWidth: 46, fontStyle: "bold" }, 2: { cellWidth: 38 }, 3: { cellWidth: 62 }, 4: { cellWidth: 30 }, 5: { cellWidth: 27 }, 6: { cellWidth: 21 } },
+      didParseCell: (d) => { if (d.section === "body" && d.column.index === 1) d.cell.styles.fontStyle = "bold"; },
+    });
+    /* agenda */
+    const TIPO = { reuniao: "Reunião", jantar: "Jantar de negócios", evento: "Evento", data: "Data comemorativa" };
+    if ((pl.agenda || []).length) {
+      doc.addPage(); y = titulo("Agenda do ano", 18);
+      const linhas = []; let mes = -1;
+      for (const e of agenda()) {
+        if (e.mesN !== mes) { mes = e.mesN; linhas.push([{ content: NV.MESES[mes].toUpperCase(), colSpan: 5, styles: { fillColor: [232, 241, 239], fontStyle: "bold", textColor: esc } }]); }
+        linhas.push([e.ds.length ? e.ds.map((x) => `${dd(x)} ${DSEM[x.getDay()]}`).join(" · ") : "Mês todo", T(e.t), TIPO[e.tipo], T(e.local), T(e.invest)]);
+      }
+      doc.autoTable({ ...base, startY: y, head: [["Quando", "Compromisso", "Tipo", "Local", "Investimento"]], body: linhas,
+        columnStyles: { 0: { cellWidth: 45 }, 2: { cellWidth: 35 }, 3: { cellWidth: 60 }, 4: { cellWidth: 30, halign: "right" } } });
+    }
+    /* campanhas e SWOT */
+    const c = pl.campanhas || [], sw = pl.swot || {};
+    if (c.length || Object.keys(sw).length) {
+      doc.addPage(); y = 18;
+      if (c.length) {
+        y = titulo("Ideias de campanhas por trimestre", y);
+        doc.autoTable({ ...base, startY: y, head: [c.map((t) => T(t.tri))], body: [c.map((t) => T(t.itens.map((x) => "• " + x).join("\n")))] });
+        y = doc.lastAutoTable.finalY + 10;
+      }
+      if (Object.keys(sw).length) {
+        const lista = (k) => T((sw[k] || []).map((x) => "• " + x).join("\n"));
+        y = titulo("SWOT", y);
+        doc.autoTable({ ...base, startY: y, head: [["Forças", "Fraquezas"]], body: [[lista("forcas"), lista("fraquezas")]], headStyles: { fillColor: ver, textColor: 255, fontStyle: "bold" } });
+        doc.autoTable({ ...base, startY: doc.lastAutoTable.finalY + 4, head: [["Oportunidades", "Ameaças"]], body: [[lista("oportunidades"), lista("ameacas")]], headStyles: { fillColor: [231, 111, 81], textColor: 255, fontStyle: "bold" } });
+      }
+    }
+    /* rodapé */
+    const n = doc.getNumberOfPages();
+    for (let i = 1; i <= n; i++) {
+      doc.setPage(i); doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(120);
+      doc.text(T(`Planejamento ${pl.ano} · Novavet Distribuidora · uso interno`), M, 203);
+      doc.text(`página ${i} de ${n}`, W - M, 203, { align: "right" });
+    }
+    NV.download(doc.output("blob"), `Planejamento_${pl.ano}_${NV.exporters.stamp()}.pdf`);
+  }
+
   function render() {
     const pl = P.ctx.p.planejamento, al = alertas();
     const abas = [["acoes", "Ações"], ["agenda", "Agenda"], ["campanhas", "Campanhas"], ["swot", "SWOT"]]
@@ -142,7 +213,8 @@
       h("div", { class: "card-head" }, h("div", {}, h("h2", {}, "Planejamento " + pl.ano),
         h("p", {}, (P.ctx.p.user.tipo === "Gerente" ? "Plano completo" : "Ações da sua equipe e dos supervisores") + lido)),
         h("div", { class: "head-tools" }, h("div", { class: "seg", role: "group", "aria-label": "Parte do planejamento" },
-          abas.map(([k, r]) => h("button", { type: "button", "aria-pressed": String(P.aba === k), onclick: () => { P.aba = k; P.aberta = -1; render(); } }, r))))),
+          abas.map(([k, r]) => h("button", { type: "button", "aria-pressed": String(P.aba === k), onclick: () => { P.aba = k; P.aberta = -1; render(); } }, r))),
+          h("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: baixarPdf }, NV.icon("i-download"), h("span", {}, "Baixar PDF")))),
       h("div", { class: "card-body" },
         al.length ? h("div", { class: "plan-atencao", role: "status" }, h("b", {}, "Atenção agora"), h("ul", {}, al.map((x) => h("li", {}, x.txt)))) : null,
         corpo));
