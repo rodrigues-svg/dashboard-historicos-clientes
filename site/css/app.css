@@ -501,6 +501,7 @@ body[data-view="home"] .bottombar { display: none !important; }
 
 /* ---------- meu mês / oportunidades ---------- */
 .mes-grid { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.mes-grid .k-ant { grid-column: 1 / -1; }
 .mes-bar { position: relative; height: 8px; margin-top: 10px; border-radius: 6px; background: var(--zebra); }
 .mes-bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; background: var(--primary); }
 .mes-bar b { position: absolute; top: -4px; width: 2px; height: 16px; background: var(--ink-2); }
