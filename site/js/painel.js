@@ -85,7 +85,7 @@
       if (k < 0 || k > 23 || !ok[e.rca[i]]) continue;
       if (lab && p.forn[e.prodForn[e.prod[i]]] !== lab) continue;
       liq[k] += e.liq[i];
-      if (k >= 12) { const kc = (k * e.nRca + e.rca[i]) * e.nCli + e.cli[i]; cli.set(kc, (cli.get(kc) || 0) + e.liq[i]); }
+      if (k >= 12 && p.cli[e.cli[i]].t === "J") { const kc = (k * e.nRca + e.rca[i]) * e.nCli + e.cli[i]; cli.set(kc, (cli.get(kc) || 0) + e.liq[i]); }
     }
     const posM = new Array(12).fill(0);
     cli.forEach((v, kc) => { if (v > 0.005) posM[Math.floor(kc / e.nCli / e.nRca) - 12]++; });
@@ -107,7 +107,7 @@
       h("td", { class: "num" }, tot.r && tot.m ? fmt.pct((tot.r / tot.m) * 100) : "—"), lab ? null : h("td", { class: "num" }, fmt.int(tot.mp)), lab ? null : h("td", { class: "num" }, tot.r ? fmt.int(tot.pr) : "—")));
     const cab = ["Mês", `Meta ${ano}`, `Realizado ${ano - 1}`, "Crescimento pedido", `Realizado ${ano}`, "Atingido"].concat(lab ? [] : ["Meta positivação", "Positivados"]);
     const quem = total ? "total da gerência (metas por laboratório)" : F.rca >= 0 ? "RCA selecionado" : F.sup >= 0 ? "equipe de " + p.sup[F.sup].n : "sua equipe";
-    return [titulo, h("p", { class: "note" }, `Meta oficial ${ano} (${quem}): ${money(tot.m)} no ano. Crescimento do ano compara só os meses que já têm realizado do ano anterior. Realizado = faturamento líquido; positivados = clientes com compra no mês somados por RCA. * mês em andamento.`),
+    return [titulo, h("p", { class: "note" }, `Meta oficial ${ano} (${quem}): ${money(tot.m)} no ano. Crescimento do ano compara só os meses que já têm realizado do ano anterior. Realizado = faturamento líquido; positivados = clientes CNPJ com faturado líquido positivo no mês, somados por RCA. * mês em andamento.`),
       h("div", { class: "table-wrap" }, h("table", { class: "tbl" }, h("thead", {}, h("tr", {}, cab.map((t, i) => h("th", { class: i ? "num" : "", style: "cursor:default" }, t)))), h("tbody", {}, linhas)))];
   }
 
@@ -125,16 +125,16 @@
     const rOk = dia.rc.map((c) => idx.has(c) && ok[idx.get(c)] === 1);
     const ymd = (y, d) => y * 10000 + (mo + 1) * 100 + d;
     const a0 = ymd(ano, 1), a1 = ymd(ano, fd), b0 = ymd(ano - 1, 1), b1 = ymd(ano - 1, dp), c1 = ymd(ano - 1, 31);
-    const cur = new Map(), prev = new Map(); let tc = 0, tp = 0, tm = 0;
+    const cur = new Map(), prev = new Map(); let tc = 0, tp = 0, tm = 0, lc = 0, lp = 0, lm = 0;
     for (let i = 0; i < dia.d.length; i++) {
       const d = dia.d[i], f = dia.f[dia.k[i]];
       if ((lab && f !== lab) || !rOk[dia.r[i]]) continue;
-      const v = dia.venda[i] / 100;
-      if (d >= a0 && d <= a1) { tc += v; cur.set(f, (cur.get(f) || 0) + v); }
-      else if (d >= b0 && d <= c1) { tm += v; if (d <= b1) { tp += v; prev.set(f, (prev.get(f) || 0) + v); } }
+      const v = dia.venda[i] / 100, l = dia.liq[i] / 100;
+      if (d >= a0 && d <= a1) { tc += v; lc += l; cur.set(f, (cur.get(f) || 0) + v); }
+      else if (d >= b0 && d <= c1) { tm += v; lm += l; if (d <= b1) { tp += v; lp += l; prev.set(f, (prev.get(f) || 0) + v); } }
     }
     const z = (n) => String(n).padStart(2, "0");
-    return { fd, dp, tc, tp, tm, cur, prev, tag: `1–${z(fd)}/${z(mo + 1)}`, tagAnt: `1–${z(dp)}/${z(mo + 1)}/${ano - 1}`,
+    return { fd, dp, tc, tp, tm, lc, lp, lm, cur, prev, tag: `1–${z(fd)}/${z(mo + 1)}`, tagAnt: `1–${z(dp)}/${z(mo + 1)}/${ano - 1}`,
       cheio: `${NV.MESES_ABR[mo]}/${ano - 1}` };
   }
   function chip(cur, old) {
@@ -153,18 +153,18 @@
     const rcas = rcasFiltro().map((r) => ({ ...r, m: metas.rca[String(r.c)] })).filter((r) => r.m);
     const alvo = F.rca >= 0 ? rcas.filter((r) => r.i === F.rca) : rcas;
     const ok = new Uint8Array(e.nRca); alvo.forEach((r) => (ok[r.i] = 1));
-    // vendido no mês (venda imputada), positivação (clientes com venda) e por fornecedor
+    // vendido no mês (venda imputada), positivação (clientes CNPJ com faturado líquido > 0) e por fornecedor
     let venda = 0; const porRca = new Float64Array(e.nRca), porForn = new Map(), cli = new Map(), cliRca = new Map();
     for (let i = 0; i < e.n; i++) {
       if (e.ym[i] !== ym) continue;
       if (F.lab >= 0 && e.prodForn[e.prod[i]] !== F.lab) continue;
-      const r = e.rca[i], v = e.venda[i];
+      const r = e.rca[i], v = e.venda[i], l = e.liq[i], pj = p.cli[e.cli[i]].t === "J";
       porRca[r] += v;
-      const kc = r * e.nCli + e.cli[i]; cliRca.set(kc, (cliRca.get(kc) || 0) + v);
+      const kc = r * e.nCli + e.cli[i]; if (pj) cliRca.set(kc, (cliRca.get(kc) || 0) + l);
       if (!ok[r]) continue;
       venda += v;
       const f = p.forn[e.prodForn[e.prod[i]]]; porForn.set(f, (porForn.get(f) || 0) + v);
-      cli.set(e.cli[i], (cli.get(e.cli[i]) || 0) + v);
+      if (pj) cli.set(e.cli[i], (cli.get(e.cli[i]) || 0) + l);
     }
     const aa = anoAnterior(ano, mo, ok, lab);
     const pos = [...cli.values()].filter((v) => v > 0.005).length;
@@ -194,11 +194,13 @@
             barra(pct), h("div", { class: "k-delta" }, h("span", { class: "pill " + (pct >= ritmo ? "ok" : "warn") }, status), ` ritmo esperado ${fmt.pct(ritmo)}`)),
           h("div", { class: "kpi" }, h("div", { class: "k-label" }, h("i", {}), "Preciso vender por dia útil"), h("div", { class: "k-value" }, restam ? money(falta / restam) : "—"),
             h("div", { class: "k-delta" }, `faltam ${money(falta)} em ${restam} dias úteis`)),
-          h("div", { class: "kpi k-sec" }, h("div", { class: "k-label" }, h("i", {}), "Clientes positivados" + (lab ? " (" + lab + ")" : "")), h("div", { class: "k-value" }, metaPos ? `${fmt.int(pos)} de ${fmt.int(metaPos)}` : fmt.int(pos)),
+          h("div", { class: "kpi k-sec" }, h("div", { class: "k-label" }, h("i", {}), "Clientes positivados (CNPJ)" + (lab ? " (" + lab + ")" : "")), h("div", { class: "k-value" }, metaPos ? `${fmt.int(pos)} de ${fmt.int(metaPos)}` : fmt.int(pos)),
             metaPos ? barra((pos / metaPos) * 100) : null, h("div", { class: "k-delta" }, !metaPos ? "a meta de positivação é geral (sem laboratório)" : metaPos > pos ? `faltam ${fmt.int(metaPos - pos)}` : "meta de positivação batida")),
-          aa ? h("div", { class: "kpi k-ant" }, h("div", { class: "k-label" }, h("i", {}), `Mesmo período de ${ano - 1}`), h("div", { class: "k-value" }, money(aa.tp)),
+          aa ? h("div", { class: "kpi k-ant" }, h("div", { class: "k-label" }, h("i", {}), `Mesmo período de ${ano - 1} · venda (transmitido)`), h("div", { class: "k-value" }, money(aa.tp)),
             h("div", { class: "k-delta" }, h("span", { class: "est-tag" }, "Mesmos dias " + aa.tag), chip(aa.tc, aa.tp), h("span", {}, ` ${ano}: ${money(aa.tc)} vs ${aa.tagAnt}`)),
-            h("div", { class: "k-delta est" }, h("span", { class: "est-tag" }, "Mês cheio " + aa.cheio), h("span", {}, money(aa.tm) + " · " + (aa.tc >= aa.tm ? "já superado em " + money(aa.tc - aa.tm) : "faltam " + money(aa.tm - aa.tc) + " para igualar")))) : null),
+            h("div", { class: "k-delta est" }, h("span", { class: "est-tag" }, "Mês cheio " + aa.cheio), h("span", {}, money(aa.tm) + " · " + (aa.tc >= aa.tm ? "já superado em " + money(aa.tc - aa.tm) : "faltam " + money(aa.tm - aa.tc) + " para igualar"))),
+            h("div", { class: "k-delta mes-fat" }, h("span", { class: "est-tag" }, "Faturado " + aa.tag), chip(aa.lc, aa.lp), h("span", {}, ` ${ano}: ${money(aa.lc)} vs ${ano - 1}: ${money(aa.lp)}`)),
+            h("div", { class: "k-delta est" }, h("span", { class: "est-tag" }, "Faturado mês cheio " + aa.cheio), h("span", {}, money(aa.lm) + " · " + (aa.lc >= aa.lm ? "já superado em " + money(aa.lc - aa.lm) : "faltam " + money(aa.lm - aa.lc) + " para igualar")))) : null),
         h("h3", { class: "aval-h3" }, "Por laboratório"),
         h("div", { class: "table-wrap" }, h("table", { class: "tbl" }, h("thead", {}, h("tr", {}, ["Laboratório", "Meta", "Vendido", "Atingido"].concat(aa ? [`${ano - 1} mesmos dias`, "Variação"] : []).map((t, i) => h("th", { class: i ? "num" : "", style: "cursor:default" }, t)))),
           h("tbody", {}, [...metaForn.entries()].sort((a, b) => b[1] - a[1] || (porForn.get(b[0]) || 0) - (porForn.get(a[0]) || 0)).map(([f, mv]) => {
@@ -213,8 +215,8 @@
               h("td", { class: "num" }, h("div", { class: "tbar " + (x.pc >= ritmo ? "ok" : "neu") }, h("span", {}, fmt.pct(x.pc)), h("i", { style: `width:${Math.min(100, x.pc)}%` }))),
               h("td", { class: "num" }, lab ? fmt.int(x.pos) : `${fmt.int(x.pos)} / ${fmt.int(x.r.m.p)}`))))))] : null,
         blocoAno(),
-        h("p", { class: "note" }, "Vendido = venda imputada no mês (base de vendas). Ritmo esperado = dias úteis passados ÷ dias úteis do mês. Metas: relatórios diários de metas por RCA, por laboratório e de positivação." +
-          (aa ? ` Ano anterior: planilha diária (venda imputada), dia 1 até o dia ${aa.fd} deste mês contra o mesmo intervalo de ${ano - 1}, dias corridos reais. "sem meta" = laboratório que não veio no relatório de metas do mês.` : ""))));
+        h("p", { class: "note" }, "Vendido = venda imputada no mês (base de vendas). Positivação = clientes CNPJ com faturado líquido positivo no mês (bonificado não conta). Ritmo esperado = dias úteis passados ÷ dias úteis do mês. Metas: relatórios diários de metas por RCA, por laboratório e de positivação." +
+          (aa ? ` Ano anterior: planilha diária (venda = transmitido; faturado = faturamento líquido), dia 1 até o dia ${aa.fd} deste mês contra o mesmo intervalo de ${ano - 1}, dias corridos reais. "sem meta" = laboratório que não veio no relatório de metas do mês.` : ""))));
   }
 
   /* ================================================================ Oportunidades */
